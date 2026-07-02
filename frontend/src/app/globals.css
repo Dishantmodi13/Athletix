@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+:root {
+  --athletix-bg-deep: #050505;
+  --athletix-bg-mid: #09090b;
+  --athletix-bg-surface: #111111;
+  --athletix-primary: #3b82f6;
+  --athletix-secondary: #a3ff12;
+  --athletix-text-primary: #ffffff;
+  --athletix-text-secondary: #d1d5db;
+  --athletix-text-muted: #9ca3af;
+  --athletix-border: rgba(255, 255, 255, 0.08);
+  --athletix-glass: rgba(255, 255, 255, 0.04);
+  --athletix-glass-border: rgba(255, 255, 255, 0.1);
+}
+
+@theme inline {
+  --color-athletix-bg-deep: var(--athletix-bg-deep);
+  --color-athletix-bg-mid: var(--athletix-bg-mid);
+  --color-athletix-bg-surface: var(--athletix-bg-surface);
+  --color-athletix-primary: var(--athletix-primary);
+  --color-athletix-secondary: var(--athletix-secondary);
+  --color-athletix-text-primary: var(--athletix-text-primary);
+  --color-athletix-text-secondary: var(--athletix-text-secondary);
+  --color-athletix-text-muted: var(--athletix-text-muted);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--athletix-bg-deep);
+  color: var(--athletix-text-primary);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes athletix-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes athletix-pulse-glow {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes athletix-grid-drift {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(40px);
+  }
+}
+
+@keyframes athletix-ring-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.auth-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+.auth-glass-card {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.04),
+    0 20px 40px -16px rgba(0, 0, 0, 0.65),
+    0 0 60px -24px rgba(59, 130, 246, 0.12);
+}
+
+.knockout-bracket-shell {
+  background: linear-gradient(180deg, #0c0c0c 0%, #050505 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 24px 48px -24px rgba(0, 0, 0, 0.8);
+}
+
+.auth-input-field:focus-within {
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.45),
+    0 0 24px -6px rgba(59, 130, 246, 0.35);
+}
+
+.auth-input-glow:focus-within {
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.4),
+    0 0 20px -4px rgba(59, 130, 246, 0.3);
+}
+
+.auth-secondary-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.auth-secondary-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(59, 130, 246, 0.25);
+  box-shadow: 0 0 20px -8px rgba(59, 130, 246, 0.2);
+}
+
+.auth-otp-box {
+  caret-color: var(--athletix-primary);
+}
+
+.auth-primary-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
+  box-shadow:
+    0 4px 24px -4px rgba(59, 130, 246, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.auth-primary-btn:hover {
+  box-shadow:
+    0 8px 32px -4px rgba(59, 130, 246, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.auth-social-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--athletix-border);
+  backdrop-filter: blur(12px);
+}
+
+.auth-social-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 24px -8px rgba(59, 130, 246, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

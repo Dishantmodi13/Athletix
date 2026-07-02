@@ -1,0 +1,354 @@
+import { env } from "../../config/env";
+import { AppError } from "../../middleware/errorHandler";
+import { cache } from "../../services/cache.service";
+import { dateISOWithOffset } from "../../utils/footballSeason";
+import { ApiKeyPool, isRateLimitError, parseKeyList } from "./apiKeyPool";
+import { WORLD_CUP_LEAGUE_ID } from "./leagueMap";
+import type {
+  FootballProvider,
+  MatchDetailsResult,
+  NormalizedMatch,
+  SearchResult,
+  StandingGroup,
+  StandingRow,
+  TopScorer,
+} from "./football.types";
+import { toStandingGroups } from "./standingsUtils";
+
+interface ApiFootballResponse<T> {
+  errors: unknown;
+  response: T;
+}
+
+interface RawFixture {
+  fixture: {
+    id: number;
+    date: string;
+    timestamp: number;
+    status: { short: string; long: string; elapsed: number | null };
+    venue: { name: string | null; city: string | null };
+  };
+  league: { id: number; name: string; logo: string; country: string; round: string };
+  teams: {
+    home: { id: number; name: string; logo: string; winner: boolean | null };
+    away: { id: number; name: string; logo: string; winner: boolean | null };
+  };
+  goals: { home: number | null; away: number | null };
+}
+
+import { FINISHED_STATUSES as FINISHED, pickLeagueFixtures, type FixtureRange } from "./fixturesUtils";
+import { eventsFromApiFootball } from "./matchEventsUtils";
+
+function normalizeMatch(raw: RawFixture): NormalizedMatch {
+  return {
+    id: raw.fixture.id,
+    date: raw.fixture.date,
+    timestamp: raw.fixture.timestamp,
+    status: raw.fixture.status,
+    league: raw.league,
+    venue: raw.fixture.venue,
+    teams: raw.teams,
+    goals: raw.goals,
+    source: "api-football",
+  };
+}
+
+export class ApiFootballProvider implements FootballProvider {
+  readonly name = "api-football";
+  private readonly keyPool: ApiKeyPool;
+
+  constructor() {
+    this.keyPool = new ApiKeyPool(
+      parseKeyList(env.footballApiKeys, env.footballApiKey)
+    );
+  }
+
+  isAvailable(): boolean {
+    return this.keyPool.hasKeys();
+  }
+
+  private buildUrl(endpoint: string, params: Record<string, string | number | undefined>) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        query.append(key, String(value));
+      }
+    });
+    return `${env.footballApiBaseUrl}/${endpoint}?${query.toString()}`;
+  }
+
+  private async fetchFromApi<T>(url: string): Promise<T> {
+    return this.keyPool.execute(async (apiKey) => {
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          headers: { "x-apisports-key": apiKey },
+        });
+      } catch {
+        throw new AppError("Unable to reach API-Football", 502);
+      }
+
+      if (res.status === 429) {
+        throw new AppError("API-Football rate limit reached", 429);
+      }
+
+      if (!res.ok) {
+        throw new AppError(`API-Football HTTP ${res.status}`, res.status);
+      }
+
+      const body = (await res.json()) as ApiFootballResponse<T>;
+
+      if (
+        body.errors &&
+        typeof body.errors === "object" &&
+        Object.keys(body.errors).length > 0
+      ) {
+        const firstError = Object.values(body.errors)[0];
+        throw new AppError(
+          typeof firstError === "string" ? firstError : "API-Football request failed",
+          400
+        );
+      }
+
+      return body.response;
+    }, isRateLimitError);
+  }
+
+  private async request<T>(
+    endpoint: string,
+    params: Record<string, string | number | undefined> = {},
+    ttlSeconds = 60
+  ): Promise<T> {
+    const url = this.buildUrl(endpoint, params);
+    const cacheKey = `af:${url}`;
+
+    return cache.wrap<T>(cacheKey, ttlSeconds, () => this.fetchFromApi<T>(url));
+  }
+
+  async getLiveMatches(): Promise<NormalizedMatch[]> {
+    const data = await this.request<RawFixture[]>("fixtures", { live: "all" }, 25);
+    return data.map(normalizeMatch);
+  }
+
+  async getFixturesByDate(date: string): Promise<NormalizedMatch[]> {
+    try {
+      const data = await this.request<RawFixture[]>("fixtures", { date }, 120);
+      return data.map(normalizeMatch);
+    } catch (error) {
+      if (error instanceof AppError && isRateLimitError(error)) throw error;
+      if (error instanceof AppError) return [];
+      throw error;
+    }
+  }
+
+  async getFixturesByLeague(
+    league: number,
+    season: number,
+    limit = 10,
+    range: FixtureRange = "mixed"
+  ): Promise<NormalizedMatch[]> {
+    if (range === "recent") {
+      try {
+        const recent = await this.request<RawFixture[]>(
+          "fixtures",
+          { league, season, last: limit },
+          120
+        );
+        if (recent.length > 0) {
+          return recent
+            .map(normalizeMatch)
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, limit);
+        }
+      } catch (error) {
+        if (error instanceof AppError && isRateLimitError(error)) throw error;
+      }
+      return [];
+    }
+
+    if (range === "upcoming") {
+      try {
+        const upcoming = await this.request<RawFixture[]>(
+          "fixtures",
+          { league, season, next: limit },
+          120
+        );
+        if (upcoming.length > 0) {
+          return upcoming.map(normalizeMatch).slice(0, limit);
+        }
+      } catch (error) {
+        if (error instanceof AppError && isRateLimitError(error)) throw error;
+      }
+      return [];
+    }
+
+    try {
+      const upcoming = await this.request<RawFixture[]>(
+        "fixtures",
+        { league, season, next: limit },
+        120
+      );
+      if (upcoming.length > 0) {
+        return upcoming.map(normalizeMatch);
+      }
+
+      const recent = await this.request<RawFixture[]>(
+        "fixtures",
+        { league, season, last: limit },
+        120
+      );
+      if (recent.length > 0) {
+        return recent
+          .map(normalizeMatch)
+          .sort((a, b) => a.timestamp - b.timestamp);
+      }
+    } catch (error) {
+      if (error instanceof AppError && isRateLimitError(error)) throw error;
+    }
+
+    const dates = Array.from({ length: 3 }, (_, i) => dateISOWithOffset(i));
+    const batches = await Promise.all(dates.map((d) => this.getFixturesByDate(d)));
+    return batches
+      .flat()
+      .filter((m) => m.league.id === league && !FINISHED.has(m.status.short))
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(0, limit);
+  }
+
+  async getStandings(league: number, season: number): Promise<StandingGroup[]> {
+    const data = await this.request<
+      Array<{ league: { standings: Array<Array<StandingRow & { group?: string }>> } }>
+    >("standings", { league, season }, 600);
+
+    const tables = data[0]?.league?.standings ?? [];
+    return toStandingGroups(
+      tables.map((rows) => ({
+        name: rows[0]?.group,
+        rows: [...(rows as StandingRow[])].sort((a, b) => a.rank - b.rank),
+      }))
+    );
+  }
+
+  async getTopScorers(league: number, season: number): Promise<TopScorer[]> {
+    if (league === WORLD_CUP_LEAGUE_ID) return [];
+    return this.request<TopScorer[]>("players/topscorers", { league, season }, 600);
+  }
+
+  async getTopAssists(league: number, season: number): Promise<TopScorer[]> {
+    if (league === WORLD_CUP_LEAGUE_ID) return [];
+    return this.request<TopScorer[]>("players/topassists", { league, season }, 600);
+  }
+
+  /** Fetch scorer/assist lists from API-Football for player photo lookup. */
+  async getScorerPhotoCatalog(league: number, season: number): Promise<TopScorer[]> {
+    const catalogKey = `af:photo-catalog:v1:${league}:${season}`;
+    const cached = cache.get<TopScorer[]>(catalogKey);
+    if (cached?.length) return cached;
+
+    const seasons =
+      league === WORLD_CUP_LEAGUE_ID
+        ? [2022, 2018, season]
+        : [season, season - 1];
+
+    const uniqueSeasons = [...new Set(seasons.filter((y) => y > 0))];
+    const merged: TopScorer[] = [];
+
+    for (const year of uniqueSeasons) {
+      try {
+        const scorers = await this.fetchFromApi<TopScorer[]>(
+          this.buildUrl("players/topscorers", { league, season: year })
+        ).catch(() => [] as TopScorer[]);
+
+        merged.push(...scorers);
+
+        if (!merged.some((row) => row.player.photo?.trim())) {
+          const assists = await this.fetchFromApi<TopScorer[]>(
+            this.buildUrl("players/topassists", { league, season: year })
+          ).catch(() => [] as TopScorer[]);
+          merged.push(...assists);
+        }
+
+        if (merged.some((row) => row.player.photo?.trim())) break;
+      } catch {
+        continue;
+      }
+    }
+
+    if (merged.some((row) => row.player.photo?.trim())) {
+      cache.set(catalogKey, merged, 86_400);
+    }
+
+    return merged;
+  }
+
+  async getMatchDetails(id: number): Promise<MatchDetailsResult> {
+    const [fixture, statistics, events, lineups] = await Promise.all([
+      this.request<RawFixture[]>("fixtures", { id }, 30),
+      this.request<unknown[]>("fixtures/statistics", { fixture: id }, 30).catch(() => []),
+      this.request<unknown[]>("fixtures/events", { fixture: id }, 30).catch(() => []),
+      this.request<unknown[]>("fixtures/lineups", { fixture: id }, 60).catch(() => []),
+    ]);
+
+    return {
+      match: fixture[0] ? normalizeMatch(fixture[0]) : null,
+      statistics,
+      events: eventsFromApiFootball(events as unknown[]),
+      lineups,
+    };
+  }
+
+  async getTeam(id: number): Promise<unknown> {
+    const data = await this.request<unknown[]>("teams", { id }, 86400);
+    return data[0] ?? null;
+  }
+
+  async getTeamFixtures(team: number, season: number): Promise<NormalizedMatch[]> {
+    try {
+      const data = await this.request<RawFixture[]>("fixtures", { team, season }, 300);
+      return data
+        .map(normalizeMatch)
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 10);
+    } catch {
+      return [];
+    }
+  }
+
+  async getPlayer(id: number, season: number): Promise<unknown> {
+    const data = await this.request<unknown[]>("players", { id, season }, 600);
+    return data[0] ?? null;
+  }
+
+  async search(query: string): Promise<SearchResult> {
+    const [teams, players] = await Promise.all([
+      this.request<unknown[]>("teams", { search: query }, 600),
+      this.request<unknown[]>("players/profiles", { search: query }, 600).catch(
+        () => [] as unknown[]
+      ),
+    ]);
+    return { teams, players };
+  }
+
+  async getHeadToHead(home: number, away: number): Promise<NormalizedMatch[]> {
+    try {
+      const data = await this.request<RawFixture[]>(
+        "fixtures/headtohead",
+        { h2h: `${home}-${away}`, last: 10 },
+        600
+      );
+      return data.map(normalizeMatch);
+    } catch {
+      return [];
+    }
+  }
+
+  async getLeagues(): Promise<unknown[]> {
+    try {
+      return await this.request<unknown[]>("leagues", { current: "true" }, 86400);
+    } catch {
+      return [];
+    }
+  }
+}
+
+export const apiFootballProvider = new ApiFootballProvider();
