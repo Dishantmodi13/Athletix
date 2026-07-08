@@ -9,7 +9,7 @@ import {
   type BracketTeam,
   type KnockoutBracket,
 } from "@/lib/football";
-import { formatKickoff } from "@/lib/format";
+import { formatKickoff, formatShortDate } from "@/lib/format";
 import { TeamLogo } from "./ui/TeamLogo";
 
 const CARD_W = 142;
@@ -44,7 +44,7 @@ function relativeDate(iso: string): string {
   if (diff === 1) return "Tomorrow";
   if (diff === -1) return "Yesterday";
   try {
-    return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+    return formatShortDate(iso);
   } catch {
     return "";
   }

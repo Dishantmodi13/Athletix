@@ -41,7 +41,7 @@ export function formatNewsTime(iso: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString([], { day: "numeric", month: "short" });
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 export function getCategoryStyle(category: NewsCategory): string {

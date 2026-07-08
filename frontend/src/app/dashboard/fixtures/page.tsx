@@ -7,21 +7,14 @@ import { SectionHeader } from "@/components/dashboard/ui/SectionHeader";
 import { SkeletonCard } from "@/components/dashboard/ui/Skeleton";
 import { useFetch } from "@/hooks/useFetch";
 import { football } from "@/lib/football";
-import { offsetDateISO } from "@/lib/format";
+import { offsetDateISO, formatFixtureDayLabel } from "@/lib/format";
 
 export default function FixturesPage() {
   const [offset, setOffset] = useState(0);
   const date = useMemo(() => offsetDateISO(offset), [offset]);
   const fixtures = useFetch(() => football.fixtures(date), [date]);
 
-  const label = useMemo(() => {
-    const d = new Date(date);
-    return d.toLocaleDateString([], {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-    });
-  }, [date]);
+  const label = useMemo(() => formatFixtureDayLabel(date), [date]);
 
   return (
     <div className="mx-auto max-w-5xl">

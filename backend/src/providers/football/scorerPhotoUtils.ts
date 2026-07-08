@@ -74,22 +74,66 @@ function lookupPhoto(
   return "";
 }
 
+function apiFootballPlayerIdFromPhoto(photo: string): number | null {
+  const match = photo.match(/\/players\/(\d+)\./);
+  if (!match) return null;
+  const id = Number(match[1]);
+  return Number.isFinite(id) ? id : null;
+}
+
+function findMatchedSource(
+  row: TopScorer,
+  sources: TopScorer[],
+  photos: Map<string, string>
+): TopScorer | undefined {
+  const teamName = row.statistics[0]?.team.name;
+  const keys = [
+    teamName ? playerKey(row.player.name, teamName) : "",
+    playerKey(row.player.name),
+  ].filter(Boolean);
+
+  for (const source of sources) {
+    const photo = source.player.photo?.trim();
+    if (!photo) continue;
+
+    const sourceTeam = source.statistics[0]?.team.name;
+    const sourceKeys = [
+      sourceTeam ? playerKey(source.player.name, sourceTeam) : "",
+      playerKey(source.player.name),
+    ].filter(Boolean);
+
+    if (sourceKeys.some((key) => keys.includes(key) && photos.get(key) === photo)) {
+      return source;
+    }
+  }
+
+  return undefined;
+}
+
 export function mergeScorerPhotos(target: TopScorer[], sources: TopScorer[]): TopScorer[] {
   if (!target.length || !sources.length) return target;
 
   const photos = buildPhotoIndex(sources);
 
   return target.map((row) => {
-    if (row.player.photo?.trim()) return row;
-
     const teamName = row.statistics[0]?.team.name;
-    const photo = lookupPhoto(row.player.name, teamName, photos);
+    const photo = row.player.photo?.trim() || lookupPhoto(row.player.name, teamName, photos);
+    const matched = findMatchedSource(row, sources, photos);
 
-    if (!photo) return row;
+    const apiFootballId =
+      matched?.player.id ??
+      (photo ? apiFootballPlayerIdFromPhoto(photo) : null) ??
+      row.player.id;
+
+    if (!photo && !matched) return row;
 
     return {
       ...row,
-      player: { ...row.player, photo },
+      player: {
+        ...row.player,
+        id: apiFootballId,
+        photo: photo || row.player.photo,
+      },
     };
   });
 }

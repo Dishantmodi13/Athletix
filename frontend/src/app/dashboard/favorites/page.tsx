@@ -10,6 +10,13 @@ import { TeamLogo } from "@/components/dashboard/ui/TeamLogo";
 import { Favorite, getFavorites } from "@/lib/favorites";
 import { isGuestMode } from "@/lib/auth";
 
+function favoriteHref(fav: Favorite): string {
+  if (fav.type === "competition") {
+    return `/dashboard/competitions/${fav.id}`;
+  }
+  return `/dashboard/${fav.type}/${fav.id}`;
+}
+
 export default function FavoritesPage() {
   const router = useRouter();
   const [favorites, setFavorites] = useState<Favorite[]>([]);
@@ -73,7 +80,7 @@ export default function FavoritesPage() {
             <button
               key={`${fav.type}-${fav.id}`}
               type="button"
-              onClick={() => router.push(`/dashboard/${fav.type}/${fav.id}`)}
+              onClick={() => router.push(favoriteHref(fav))}
               className="auth-glass-card flex items-center gap-3 rounded-2xl p-4 text-left transition-all hover:border-athletix-primary/30"
             >
               <TeamLogo src={fav.logo ?? ""} alt={fav.name} size={36} />

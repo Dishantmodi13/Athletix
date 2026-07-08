@@ -1,10 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, User } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { LiveBadge } from "@/components/dashboard/LiveBadge";
+import { MatchLineupList } from "@/components/dashboard/match/MatchLineupList";
+import { MatchPitchLineup, resolveMatchLineups, type TeamLineup } from "@/components/dashboard/match/MatchPitchLineup";
 import { TeamLogo } from "@/components/dashboard/ui/TeamLogo";
 import { Skeleton } from "@/components/dashboard/ui/Skeleton";
 import { useFetch } from "@/hooks/useFetch";
@@ -16,6 +18,7 @@ import {
   type MatchScoreSummary,
 } from "@/lib/football";
 import { formatKickoff, formatMatchDate } from "@/lib/format";
+import { getFifaRank, isInternationalMatch } from "@/lib/fifaRankings";
 
 interface StatEntry {
   type: string;
@@ -25,18 +28,27 @@ interface TeamStats {
   team: { id: number; name: string; logo: string };
   statistics: StatEntry[];
 }
-interface Lineup {
-  team: { id: number; name: string; logo: string };
-  formation: string;
-  startXI: Array<{ player: { id: number; name: string; number: number; pos: string } }>;
-  coach: { name: string };
-}
 
 type Tab = "goals" | "stats" | "lineups" | "timeline";
 
 function formatMinute(time: MatchEvent["time"]): string {
   if (time.extra) return `${time.elapsed}+${time.extra}'`;
   return `${time.elapsed}'`;
+}
+
+function namesMatch(a: string, b: string): boolean {
+  const na = a.toLowerCase().replace(/[^a-z]/g, "");
+  const nb = b.toLowerCase().replace(/[^a-z]/g, "");
+  return na.includes(nb) || nb.includes(na);
+}
+
+function statsForTeam(
+  stats: TeamStats[],
+  teamName: string,
+  fallbackIndex: number
+): StatEntry[] | undefined {
+  const byName = stats.find((s) => namesMatch(s.team.name, teamName));
+  return byName?.statistics ?? stats[fallbackIndex]?.statistics;
 }
 
 function statValue(stats: StatEntry[] | undefined, type: string): number {
@@ -215,13 +227,22 @@ export default function MatchDetailsPage() {
   const stats = (data?.statistics as TeamStats[]) ?? [];
   const events = data?.events ?? [];
   const goals = events.filter((e) => e.type === "Goal");
-  const lineups = (data?.lineups as Lineup[]) ?? [];
+  const lineups = (data?.lineups as TeamLineup[]) ?? [];
   const scoreSummary = data?.scoreSummary ?? [];
   const score = displayScore(match.goals, scoreSummary);
   const live = isLive(match.status.short);
   const finished = isFinished(match.status.short);
-  const homeStats = stats[0]?.statistics;
-  const awayStats = stats[1]?.statistics;
+  const homeStats = statsForTeam(stats, match.teams.home.name, 0);
+  const awayStats = statsForTeam(stats, match.teams.away.name, 1);
+  const showFifaRank = isInternationalMatch(match.league.id, match.league.name);
+  const homeFifa = showFifaRank ? getFifaRank(match.teams.home.name) : null;
+  const awayFifa = showFifaRank ? getFifaRank(match.teams.away.name) : null;
+
+  const { home: homeLineup, away: awayLineup } = resolveMatchLineups(
+    lineups,
+    match.teams.home,
+    match.teams.away
+  );
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "goals", label: "Goalscorers", count: goals.length },
@@ -231,7 +252,7 @@ export default function MatchDetailsPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className={`mx-auto ${tab === "lineups" && homeLineup && awayLineup ? "max-w-2xl" : "max-w-3xl"}`}>
       <button
         type="button"
         onClick={() => router.back()}
@@ -270,6 +291,11 @@ export default function MatchDetailsPage() {
               <span className="text-center text-sm font-semibold text-white">
                 {match.teams.home.name}
               </span>
+              {homeFifa !== null && (
+                <span className="text-[10px] font-medium text-athletix-text-muted">
+                  FIFA #{homeFifa}
+                </span>
+              )}
             </button>
             <div className="flex flex-col items-center gap-2">
               <div className="text-4xl font-bold tabular-nums text-white sm:text-5xl">
@@ -298,6 +324,11 @@ export default function MatchDetailsPage() {
               <span className="text-center text-sm font-semibold text-white">
                 {match.teams.away.name}
               </span>
+              {awayFifa !== null && (
+                <span className="text-[10px] font-medium text-athletix-text-muted">
+                  FIFA #{awayFifa}
+                </span>
+              )}
             </button>
           </div>
 
@@ -400,36 +431,10 @@ export default function MatchDetailsPage() {
 
       {/* Lineups */}
       {tab === "lineups" &&
-        (lineups.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {lineups.map((lineup) => (
-              <div key={lineup.team.id} className="auth-glass-card rounded-2xl p-5">
-                <div className="mb-4 flex items-center gap-2.5">
-                  <TeamLogo src={lineup.team.logo} alt={lineup.team.name} size={28} />
-                  <div>
-                    <p className="text-sm font-semibold text-white">{lineup.team.name}</p>
-                    <p className="text-xs text-athletix-text-muted">{lineup.formation}</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {lineup.startXI.map((p) => (
-                    <div key={p.player.id} className="flex items-center gap-3 text-sm">
-                      <span className="w-6 text-center text-xs font-semibold text-athletix-text-muted">
-                        {p.player.number}
-                      </span>
-                      <span className="text-white">{p.player.name}</span>
-                      <span className="ml-auto text-xs text-athletix-text-muted">{p.player.pos}</span>
-                    </div>
-                  ))}
-                </div>
-                {lineup.coach?.name && (
-                  <div className="mt-4 flex items-center gap-2 border-t border-white/[0.06] pt-3 text-xs text-athletix-text-muted">
-                    <User className="h-3.5 w-3.5" /> {lineup.coach.name}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+        (homeLineup && awayLineup ? (
+          <MatchPitchLineup home={homeLineup} away={awayLineup} events={events} />
+        ) : lineups.length > 0 ? (
+          <MatchLineupList lineups={lineups} />
         ) : (
           <Empty message="Lineups will be announced before kickoff." />
         ))}

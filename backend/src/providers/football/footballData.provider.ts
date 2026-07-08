@@ -479,7 +479,7 @@ export class FootballDataProvider implements FootballProvider {
   }
 
   async getMatchDetails(id: number): Promise<MatchDetailsResult> {
-    const raw = await this.requestMatch<FdMatch>(`/matches/${id}`, 30);
+    const raw = await this.requestMatch<FdMatch>(`/matches/${id}`, 3600);
     const match = normalizeFdMatch(raw);
     const extras: FootballDataMatchExtras = {
       goals: raw.goals,

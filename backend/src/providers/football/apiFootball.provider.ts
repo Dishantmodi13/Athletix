@@ -38,6 +38,7 @@ interface RawFixture {
 
 import { FINISHED_STATUSES as FINISHED, pickLeagueFixtures, type FixtureRange } from "./fixturesUtils";
 import { eventsFromApiFootball } from "./matchEventsUtils";
+import { normalizeLineups } from "./lineupUtils";
 
 function normalizeMatch(raw: RawFixture): NormalizedMatch {
   return {
@@ -122,7 +123,23 @@ export class ApiFootballProvider implements FootballProvider {
     const url = this.buildUrl(endpoint, params);
     const cacheKey = `af:${url}`;
 
-    return cache.wrap<T>(cacheKey, ttlSeconds, () => this.fetchFromApi<T>(url));
+    const cached = cache.get<T>(cacheKey);
+    if (cached !== undefined) return cached;
+
+    try {
+      const value = await this.fetchFromApi<T>(url);
+      cache.set(cacheKey, value, ttlSeconds);
+      return value;
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        const stale = cache.getStale<T>(cacheKey);
+        if (stale !== undefined) {
+          console.warn(`[API-Football] Serving stale cache for ${endpoint}`);
+          return stale;
+        }
+      }
+      throw error;
+    }
   }
 
   async getLiveMatches(): Promise<NormalizedMatch[]> {
@@ -282,19 +299,38 @@ export class ApiFootballProvider implements FootballProvider {
   }
 
   async getMatchDetails(id: number): Promise<MatchDetailsResult> {
-    const [fixture, statistics, events, lineups] = await Promise.all([
-      this.request<RawFixture[]>("fixtures", { id }, 30),
-      this.request<unknown[]>("fixtures/statistics", { fixture: id }, 30).catch(() => []),
-      this.request<unknown[]>("fixtures/events", { fixture: id }, 30).catch(() => []),
-      this.request<unknown[]>("fixtures/lineups", { fixture: id }, 60).catch(() => []),
-    ]);
+    const detailCacheKey = `af:match-details:v1:${id}`;
+    const cached = cache.get<MatchDetailsResult>(detailCacheKey);
+    if (cached?.match) return cached;
 
-    return {
-      match: fixture[0] ? normalizeMatch(fixture[0]) : null,
-      statistics,
-      events: eventsFromApiFootball(events as unknown[]),
-      lineups,
-    };
+    try {
+      const [fixture, statistics, events, lineups] = await Promise.all([
+        this.request<RawFixture[]>("fixtures", { id }, 300),
+        this.request<unknown[]>("fixtures/statistics", { fixture: id }, 3600).catch(() => []),
+        this.request<unknown[]>("fixtures/events", { fixture: id }, 3600).catch(() => []),
+        this.request<unknown[]>("fixtures/lineups", { fixture: id }, 86_400).catch(() => []),
+      ]);
+
+      const result: MatchDetailsResult = {
+        match: fixture[0] ? normalizeMatch(fixture[0]) : null,
+        statistics,
+        events: eventsFromApiFootball(events as unknown[]),
+        lineups: normalizeLineups(lineups as unknown[]),
+      };
+
+      if (result.match && (result.lineups.length > 0 || result.events.length > 0)) {
+        cache.set(detailCacheKey, result, 86_400);
+      }
+
+      return result;
+    } catch (error) {
+      const stale = cache.getStale<MatchDetailsResult>(detailCacheKey);
+      if (stale?.match) {
+        console.warn(`[API-Football] Serving stale match details for fixture ${id}`);
+        return stale;
+      }
+      throw error;
+    }
   }
 
   async getTeam(id: number): Promise<unknown> {
@@ -315,8 +351,20 @@ export class ApiFootballProvider implements FootballProvider {
   }
 
   async getPlayer(id: number, season: number): Promise<unknown> {
-    const data = await this.request<unknown[]>("players", { id, season }, 600);
-    return data[0] ?? null;
+    const seasons = [...new Set([season, season - 1, 2024, 2023, 2022].filter((y) => y > 0))];
+
+    for (const year of seasons) {
+      try {
+        const data = await this.fetchFromApi<unknown[]>(
+          this.buildUrl("players", { id, season: year })
+        );
+        if (data[0]) return data[0];
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
   }
 
   async search(query: string): Promise<SearchResult> {
@@ -327,6 +375,38 @@ export class ApiFootballProvider implements FootballProvider {
       ),
     ]);
     return { teams, players };
+  }
+
+  async searchTeams(query: string): Promise<Array<{ id: number; name: string }>> {
+    try {
+      const data = await this.request<Array<{ team: { id: number; name: string } }>>(
+        "teams",
+        { search: query },
+        86_400
+      );
+      return data.map((row) => row.team).filter((t) => t?.id);
+    } catch {
+      return [];
+    }
+  }
+
+  async findHeadToHeadFixtureId(
+    homeId: number,
+    awayId: number,
+    targetDate: string
+  ): Promise<number | null> {
+    try {
+      const data = await this.request<RawFixture[]>(
+        "fixtures/headtohead",
+        { h2h: `${homeId}-${awayId}`, last: 5 },
+        3600
+      );
+      const targetDay = targetDate.split("T")[0];
+      const onDay = data.find((f) => f.fixture.date.startsWith(targetDay));
+      return (onDay ?? data[0])?.fixture.id ?? null;
+    } catch {
+      return null;
+    }
   }
 
   async getHeadToHead(home: number, away: number): Promise<NormalizedMatch[]> {
