@@ -10,6 +10,7 @@ import {
   sendOtpEmail,
   verifyOtpHash,
 } from "../services/otp.service";
+import { serializeUser } from "../utils/userSerializer";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -114,7 +115,7 @@ export async function verifyOtp(req: Request, res: Response): Promise<void> {
   if (!user) {
     user = await User.create({
       email,
-      name: displayNameFromEmail(email),
+      username: displayNameFromEmail(email),
     });
   }
 
@@ -124,12 +125,7 @@ export async function verifyOtp(req: Request, res: Response): Promise<void> {
     success: true,
     message: "Signed in successfully",
     data: {
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar,
-      },
+      user: serializeUser(user),
       token,
     },
   });

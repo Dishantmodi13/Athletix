@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { disableGuestMode } from "@/lib/auth";
 import { saveAuthToken, sendOtp, verifyOtp } from "@/lib/api";
+import { saveUserProfile } from "@/lib/user";
 import { validateEmail } from "../EmailInput";
 
 export type AuthStep = "email" | "otp";
@@ -71,6 +72,7 @@ export function useAuthFlow() {
       const data = await verifyOtp(email.trim(), otp);
       disableGuestMode();
       saveAuthToken(data.token);
+      saveUserProfile(data.user);
       setSuccess(true);
       setTimeout(() => router.push("/dashboard"), 900);
     } catch (err) {

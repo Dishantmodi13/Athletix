@@ -62,11 +62,31 @@ export function getCategoryMeta(category: NewsCategory) {
   );
 }
 
+const FOOTBALL_PLACEHOLDER_PHOTOS = [
+  "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&h=450&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=800&h=450&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1522778119026-d647f0596c20?w=800&h=450&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800&h=450&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1522771739844-15052f2142fe?w=800&h=450&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1489944440615-453fc83b55ad?w=800&h=450&fit=crop&q=80",
+] as const;
+
 export function getPlaceholderImage(seed: string): string {
   const hash = seed.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const hues = [220, 250, 200, 170, 280, 320];
-  const hue = hues[hash % hues.length];
-  return `data:image/svg+xml,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="hsl(${hue},60%,18%)"/><stop offset="100%" stop-color="hsl(${hue},50%,10%)"/></linearGradient></defs><rect width="800" height="450" fill="url(#g)"/><circle cx="400" cy="225" r="72" fill="none" stroke="hsl(${hue},70%,45%)" stroke-width="3" opacity="0.5"/><path d="M368 225 L400 193 L432 225 L400 257 Z" fill="hsl(${hue},70%,50%)" opacity="0.35"/></svg>`
-  )}`;
+  return FOOTBALL_PLACEHOLDER_PHOTOS[hash % FOOTBALL_PLACEHOLDER_PHOTOS.length]!;
+}
+
+/** Resolve a displayable image URL — proxied to avoid hotlink blocks. */
+export function getNewsImageSrc(image: string | null | undefined, articleId: string): string {
+  const fallback = getPlaceholderImage(articleId);
+
+  if (!image?.trim()) {
+    return `/api/news/image?url=${encodeURIComponent(fallback)}`;
+  }
+
+  if (image.startsWith("/api/news/image")) {
+    return image;
+  }
+
+  return `/api/news/image?url=${encodeURIComponent(image.trim())}`;
 }

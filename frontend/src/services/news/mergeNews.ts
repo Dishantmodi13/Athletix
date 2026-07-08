@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import type { NewsArticle, NewsCategory, RawNewsItem } from "@/types/news";
 import { fetchAllRssFeeds } from "./rss";
 import { fetchGNewsArticles, shouldSupplementWithGNews } from "./gnews";
+import { enrichMissingImages } from "./imageEnrichment";
 
 const CACHE_TTL_MS = 12 * 60 * 1000;
 const MAX_ARTICLES = 150;
@@ -284,6 +285,8 @@ export async function fetchMergedNews(): Promise<NewsArticle[]> {
   }
 
   const deduped = dedupeArticles(allItems);
+  await enrichMissingImages(deduped);
+
   const articles = deduped
     .map(toNewsArticle)
     .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())

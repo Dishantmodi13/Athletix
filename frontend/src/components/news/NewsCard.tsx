@@ -5,7 +5,7 @@ import { ArrowUpRight, Clock } from "lucide-react";
 import { memo } from "react";
 import { NewsCategoryBadge } from "./NewsCategory";
 import type { NewsArticle } from "@/types/news";
-import { formatNewsTime, getPlaceholderImage } from "@/lib/news";
+import { formatNewsTime, getNewsImageSrc, getPlaceholderImage } from "@/lib/news";
 
 interface NewsCardProps {
   article: NewsArticle;
@@ -18,7 +18,8 @@ export const NewsCard = memo(function NewsCard({
   index = 0,
   featured = false,
 }: NewsCardProps) {
-  const imageSrc = article.image ?? getPlaceholderImage(article.id);
+  const imageSrc = getNewsImageSrc(article.image, article.id);
+  const fallbackSrc = `/api/news/image?url=${encodeURIComponent(getPlaceholderImage(article.id))}`;
 
   return (
     <motion.article
@@ -38,7 +39,9 @@ export const NewsCard = memo(function NewsCard({
           decoding="async"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           onError={(e) => {
-            e.currentTarget.src = getPlaceholderImage(article.id);
+            if (e.currentTarget.src !== fallbackSrc) {
+              e.currentTarget.src = fallbackSrc;
+            }
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />

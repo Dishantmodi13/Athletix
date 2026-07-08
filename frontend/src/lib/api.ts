@@ -1,4 +1,5 @@
 import { disableGuestMode } from "./auth";
+import type { UserProfile } from "@/types/user";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api";
 
@@ -40,7 +41,7 @@ export async function sendOtp(email: string) {
 
 export async function verifyOtp(email: string, otp: string) {
   return apiRequest<{
-    user: { id: string; name: string; email: string; avatar?: string };
+    user: UserProfile;
     token: string;
   }>("/auth/verify-otp", {
     method: "POST",

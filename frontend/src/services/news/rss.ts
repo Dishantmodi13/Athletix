@@ -63,23 +63,83 @@ function stripHtml(value: string): string {
     .trim();
 }
 
-function pickImage(item: Parser.Item & Record<string, unknown>): string | null {
-  const enclosure = item.enclosure as { url?: string; type?: string } | undefined;
-  if (enclosure?.url && (!enclosure.type || enclosure.type.startsWith("image"))) {
-    return enclosure.url;
+function resolveImageUrl(baseUrl: string, src: string | undefined): string | null {
+  if (!src?.trim()) return null;
+  try {
+    return new URL(src.trim(), baseUrl).href;
+  } catch {
+    return null;
+  }
+}
+
+function mediaUrl(entry: unknown): string | null {
+  if (!entry) return null;
+  if (typeof entry === "string") return entry;
+  if (Array.isArray(entry)) return mediaUrl(entry[0]);
+  if (typeof entry === "object") {
+    const obj = entry as Record<string, unknown>;
+    if (typeof obj.url === "string") return obj.url;
+    const attrs = obj.$ as { url?: string } | undefined;
+    if (attrs?.url) return attrs.url;
+  }
+  return null;
+}
+
+function extractImgFromHtml(html: string, baseUrl: string): string | null {
+  const patterns = [
+    /<img[^>]+(?:data-src|data-lazy-src|data-original)=["']([^"']+)["']/i,
+    /<img[^>]+srcset=["']([^"'\s,]+)/i,
+    /<img[^>]+src=["']([^"']+)["']/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    const resolved = resolveImageUrl(baseUrl, match?.[1]);
+    if (
+      resolved &&
+      !resolved.includes("pixel") &&
+      !resolved.includes("1x1") &&
+      !resolved.endsWith(".gif") &&
+      !resolved.includes("spacer")
+    ) {
+      return resolved;
+    }
   }
 
-  const mediaContent = item.mediaContent as Array<{ $?: { url?: string } }> | undefined;
-  const fromMedia = mediaContent?.[0]?.$?.url;
-  if (fromMedia) return fromMedia;
+  return null;
+}
 
-  const mediaThumbnail = item.mediaThumbnail as Array<{ $?: { url?: string } }> | undefined;
-  const fromThumb = mediaThumbnail?.[0]?.$?.url;
-  if (fromThumb) return fromThumb;
+function pickImage(item: Parser.Item & Record<string, unknown>): string | null {
+  const baseUrl = item.link ?? item.guid ?? "https://example.com";
 
-  const content = item.content ?? item["content:encoded"] ?? "";
-  const match = String(content).match(/<img[^>]+src=["']([^"']+)["']/i);
-  return match?.[1] ?? null;
+  const enclosure = item.enclosure as { url?: string; type?: string } | undefined;
+  if (enclosure?.url && (!enclosure.type || enclosure.type.startsWith("image"))) {
+    return resolveImageUrl(baseUrl, enclosure.url);
+  }
+
+  const fromMedia = mediaUrl(item.mediaContent) ?? mediaUrl(item.mediaThumbnail);
+  if (fromMedia) return resolveImageUrl(baseUrl, fromMedia);
+
+  const itunesImage = (item as { itunes?: { image?: string } }).itunes?.image;
+  if (itunesImage) return resolveImageUrl(baseUrl, itunesImage);
+
+  if (typeof item.image === "string" && item.image) {
+    return resolveImageUrl(baseUrl, item.image);
+  }
+
+  const htmlFields = [
+    item.content,
+    item["content:encoded"],
+    item.summary,
+    item.description,
+  ];
+
+  for (const field of htmlFields) {
+    const fromHtml = extractImgFromHtml(String(field ?? ""), baseUrl);
+    if (fromHtml) return fromHtml;
+  }
+
+  return null;
 }
 
 function normalizeRssItem(item: Parser.Item, source: string): RawNewsItem | null {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { AthletixLogo } from "@/components/auth/AthletixLogo";
+import { ProfileMenu } from "@/components/dashboard/ProfileMenu";
 
 export function Navbar() {
   const router = useRouter();
@@ -54,13 +55,7 @@ export function Navbar() {
             <Bell className="h-[18px] w-[18px]" />
             <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-athletix-secondary" />
           </button>
-          <Link
-            href="/dashboard/profile"
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-athletix-primary to-blue-700 text-sm font-bold text-white"
-            aria-label="Profile"
-          >
-            A
-          </Link>
+          <ProfileMenu />
         </div>
       </div>
     </header>

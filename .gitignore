@@ -45,8 +45,9 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 
-# Misc
-.vercel
+# User uploads
+backend/uploads/
+
 .turbo
 *.pem
 .cache/
