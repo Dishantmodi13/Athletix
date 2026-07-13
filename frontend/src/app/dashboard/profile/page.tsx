@@ -1,9 +1,9 @@
 "use client";
 
-import { LogIn, Save, User } from "lucide-react";
-import Link from "next/link";
+import { Save, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
+import { ProfileSignIn } from "@/components/dashboard/ProfileSignIn";
 import { SectionHeader } from "@/components/dashboard/ui/SectionHeader";
 import { useUser } from "@/context/UserContext";
 import {
@@ -21,7 +21,7 @@ const selectClass =
   "w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-sm text-white outline-none transition-colors focus:border-athletix-primary/40 disabled:cursor-not-allowed disabled:opacity-50";
 
 export default function ProfilePage() {
-  const { user, isGuest, loading, updateProfile } = useUser();
+  const { user, loading, updateProfile } = useUser();
 
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
@@ -90,21 +90,14 @@ export default function ProfilePage() {
     );
   }
 
-  if (isGuest || !user) {
+  if (!user) {
     return (
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-2xl space-y-6">
         <SectionHeader title="Profile" icon={<User className="h-5 w-5" />} />
-        <div className="auth-glass-card rounded-2xl p-8 text-center">
-          <p className="mb-4 text-sm text-athletix-text-muted">
-            Sign in to set your username, contact details, and profile picture.
-          </p>
-          <Link
-            href="/auth"
-            className="auth-primary-btn inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-semibold text-white"
-          >
-            <LogIn className="h-4 w-4" /> Sign In
-          </Link>
-        </div>
+        <p className="text-sm text-athletix-text-muted">
+          Sign in to set your username, contact details, and profile picture.
+        </p>
+        <ProfileSignIn />
       </div>
     );
   }

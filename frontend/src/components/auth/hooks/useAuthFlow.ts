@@ -9,8 +9,16 @@ import { validateEmail } from "../EmailInput";
 
 export type AuthStep = "email" | "otp";
 
-export function useAuthFlow() {
+interface UseAuthFlowOptions {
+  /** Called after OTP verification succeeds instead of redirecting. */
+  onVerified?: () => void | Promise<void>;
+  /** Where to send the user after success. Set to false to stay on the page. */
+  redirectTo?: string | false;
+}
+
+export function useAuthFlow(options: UseAuthFlowOptions = {}) {
   const router = useRouter();
+  const { onVerified, redirectTo = "/dashboard" } = options;
   const [step, setStep] = useState<AuthStep>("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -20,7 +28,6 @@ export function useAuthFlow() {
   const [shakeKey, setShakeKey] = useState(0);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [success, setSuccess] = useState(false);
-  const [devCode, setDevCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -47,11 +54,10 @@ export function useAuthFlow() {
 
     setLoading(true);
     try {
-      const result = await sendOtp(email.trim());
+      await sendOtp(email.trim());
       setStep("otp");
       setOtp("");
       setResendCooldown(60);
-      setDevCode(result.devCode ?? null);
     } catch (err) {
       triggerError(err instanceof Error ? err.message : "Failed to send verification code");
     } finally {
@@ -73,14 +79,22 @@ export function useAuthFlow() {
       disableGuestMode();
       saveAuthToken(data.token);
       saveUserProfile(data.user);
+
+      if (onVerified) {
+        await onVerified();
+        return;
+      }
+
       setSuccess(true);
-      setTimeout(() => router.push("/dashboard"), 900);
+      if (redirectTo !== false) {
+        setTimeout(() => router.push(redirectTo), 900);
+      }
     } catch (err) {
       triggerError(err instanceof Error ? err.message : "Verification failed");
     } finally {
       setLoading(false);
     }
-  }, [email, otp, router, triggerError]);
+  }, [email, otp, onVerified, redirectTo, router, triggerError]);
 
   const resendCode = useCallback(async () => {
     if (resendCooldown > 0) return;
@@ -88,10 +102,9 @@ export function useAuthFlow() {
     setLoading(true);
 
     try {
-      const result = await sendOtp(email.trim());
+      await sendOtp(email.trim());
       setOtp("");
       setResendCooldown(60);
-      setDevCode(result.devCode ?? null);
     } catch (err) {
       triggerError(err instanceof Error ? err.message : "Failed to resend code");
     } finally {
@@ -104,7 +117,6 @@ export function useAuthFlow() {
     setOtp("");
     setError(null);
     setEmailError(null);
-    setDevCode(null);
   }, []);
 
   return {
@@ -119,7 +131,6 @@ export function useAuthFlow() {
     shakeKey,
     resendCooldown,
     success,
-    devCode,
     sendVerificationCode,
     verifyAndContinue,
     resendCode,

@@ -89,7 +89,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     clearAuthSession();
     setUser(null);
     setIsGuest(false);
-    router.push("/auth");
+    router.push("/dashboard");
   }, [router]);
 
   const value = useMemo(

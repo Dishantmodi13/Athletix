@@ -13,6 +13,7 @@ interface EmailStepProps {
   emailError: string | null;
   loading: boolean;
   onSubmit: () => void;
+  variant?: "auth" | "profile";
 }
 
 export function EmailStep({
@@ -21,6 +22,7 @@ export function EmailStep({
   emailError,
   loading,
   onSubmit,
+  variant = "auth",
 }: EmailStepProps) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -38,18 +40,26 @@ export function EmailStep({
       className="flex flex-col gap-6"
       noValidate
     >
-      <AthletixLogo size="md" />
+      {variant === "auth" && <AthletixLogo size="md" />}
 
       <AuthHeading
         title={
-          <>
-            Welcome to{" "}
-            <span className="bg-gradient-to-r from-athletix-primary to-blue-400 bg-clip-text text-transparent">
-              Athletix
-            </span>
-          </>
+          variant === "profile" ? (
+            "Enter your email"
+          ) : (
+            <>
+              Welcome to{" "}
+              <span className="bg-gradient-to-r from-athletix-primary to-blue-400 bg-clip-text text-transparent">
+                Athletix
+              </span>
+            </>
+          )
         }
-        subtitle="Continue with your email to personalize your sports experience."
+        subtitle={
+          variant === "profile"
+            ? "Enter the email address linked to your account. We'll send you a verification code."
+            : "Continue with your email to personalize your sports experience."
+        }
       />
 
       <motion.div

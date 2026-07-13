@@ -1,9 +1,11 @@
 "use client";
 
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PlayerAvatar } from "@/components/dashboard/ui/PlayerAvatar";
 import { TeamLogo } from "@/components/dashboard/ui/TeamLogo";
 import type { MatchEvent } from "@/lib/football";
+import { playerRoute } from "@/lib/football";
 
 export interface LineupPlayer {
   id: number;
@@ -33,6 +35,12 @@ interface GridPos {
   col: number;
 }
 
+interface SubstitutionInfo {
+  kind: "in" | "out";
+  minute: number;
+  otherPlayer?: string | null;
+}
+
 function parseGrid(grid: string | null): GridPos | null {
   if (!grid) return null;
   const [row, col] = grid.split(":").map(Number);
@@ -43,6 +51,60 @@ function parseGrid(grid: string | null): GridPos | null {
 function lastName(full: string): string {
   const parts = full.trim().split(/\s+/).filter(Boolean);
   return parts.length > 1 ? parts[parts.length - 1]! : full;
+}
+
+function namesMatch(a: string, b: string): boolean {
+  const na = a.toLowerCase().replace(/[^a-z]/g, "");
+  const nb = b.toLowerCase().replace(/[^a-z]/g, "");
+  return na.includes(nb) || nb.includes(na);
+}
+
+function playerMatches(
+  playerId: number,
+  playerName: string,
+  eventName: string,
+  eventId?: number
+): boolean {
+  if (eventId && playerId > 0 && eventId === playerId) return true;
+  return (
+    eventName.toLowerCase() === playerName.toLowerCase() ||
+    namesMatch(eventName, playerName)
+  );
+}
+
+/** player = subbed off, assist = subbed on (API-Football convention). */
+export function getSubstitutionInfo(
+  playerId: number,
+  playerName: string,
+  teamId: number,
+  events: MatchEvent[],
+  teamName?: string
+): SubstitutionInfo | null {
+  for (const event of events) {
+    if (event.type !== "subst") continue;
+    const sameTeam =
+      event.team.id === teamId ||
+      (teamName ? namesMatch(event.team.name, teamName) : false);
+    if (!sameTeam) continue;
+
+    if (event.assist?.name && playerMatches(playerId, playerName, event.assist.name)) {
+      return {
+        kind: "in",
+        minute: event.time.elapsed,
+        otherPlayer: event.player.name,
+      };
+    }
+
+    if (playerMatches(playerId, playerName, event.player.name, event.player.id)) {
+      return {
+        kind: "out",
+        minute: event.time.elapsed,
+        otherPlayer: event.assist?.name,
+      };
+    }
+  }
+
+  return null;
 }
 
 function computePositions(
@@ -68,23 +130,18 @@ function computePositions(
     rowPlayers.sort((a, b) => a.grid.col - b.grid.col);
 
     rowPlayers.forEach((entry) => {
-      const x = 12 + ((entry.grid.col - 0.5) / maxCol) * 76;
+      const x = 14 + ((entry.grid.col - 0.5) / maxCol) * 70;
       const rowProgress = (row - 1) / Math.max(maxRow - 1, 1);
+      // Push away team up and home team down to open space in the middle
       const y =
         side === "home"
-          ? 88 - rowProgress * 36
-          : 12 + rowProgress * 36;
+          ? 90 - rowProgress * 34
+          : 10 + rowProgress * 34;
       positions.set(entry.player.id, { x, y });
     });
   }
 
   return positions;
-}
-
-function namesMatch(a: string, b: string): boolean {
-  const na = a.toLowerCase().replace(/[^a-z]/g, "");
-  const nb = b.toLowerCase().replace(/[^a-z]/g, "");
-  return na.includes(nb) || nb.includes(na);
 }
 
 export function resolveMatchLineups(
@@ -118,10 +175,16 @@ function playerEvents(
   playerId: number,
   playerName: string,
   teamId: number,
-  events: MatchEvent[]
+  events: MatchEvent[],
+  teamName?: string
 ) {
   const lower = playerName.toLowerCase();
   return events.filter((e) => {
+    if (e.type === "subst") return false;
+    const sameTeam =
+      e.team.id === teamId ||
+      (teamName ? namesMatch(e.team.name, teamName) : false);
+    if (!sameTeam) return false;
     const playerMatch =
       e.player.id === playerId ||
       e.player.name.toLowerCase() === lower ||
@@ -135,22 +198,53 @@ function playerEvents(
   });
 }
 
+function SubstitutionBadge({ info }: { info: SubstitutionInfo }) {
+  const Icon = info.kind === "in" ? ArrowUp : ArrowDown;
+  const color = info.kind === "in" ? "text-emerald-400" : "text-rose-400";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 text-[9px] font-semibold ${color}`}
+      title={
+        info.otherPlayer
+          ? info.kind === "in"
+            ? `Replaced ${info.otherPlayer}`
+            : `Replaced by ${info.otherPlayer}`
+          : undefined
+      }
+    >
+      <Icon className="h-3 w-3" strokeWidth={2.5} />
+      {info.minute}&apos;
+    </span>
+  );
+}
+
 function PitchPlayer({
   player,
   x,
   y,
+  teamId,
+  teamName,
   events,
   onClick,
 }: {
   player: LineupPlayer;
   x: number;
   y: number;
+  teamId: number;
+  teamName: string;
   events: MatchEvent[];
   onClick: () => void;
 }) {
-  const goals = events.filter((e) => e.type === "Goal");
-  const cards = events.filter((e) => e.type === "Card");
-  const sub = events.find((e) => e.type === "subst");
+  const matchEvents = playerEvents(player.id, player.name, teamId, events, teamName);
+  const cards = matchEvents.filter((e) => e.type === "Card");
+  const substitution = getSubstitutionInfo(
+    player.id,
+    player.name,
+    teamId,
+    events,
+    teamName
+  );
 
   return (
     <button
@@ -161,20 +255,16 @@ function PitchPlayer({
     >
       <div className="relative">
         <PlayerAvatar src={player.photo} name={player.name} size={36} />
-        {goals.length > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/80 text-[9px]">
-            ⚽
-          </span>
-        )}
         {cards.some((c) => c.detail.includes("Red")) && (
           <span className="absolute -left-1 -top-1 h-3 w-2.5 rounded-sm bg-red-500" />
         )}
         {cards.some((c) => !c.detail.includes("Red")) && (
           <span className="absolute -left-1 -top-1 h-3 w-2.5 rounded-sm bg-yellow-400" />
         )}
-        {sub && (
-          <span className="absolute -bottom-1 -right-1 rounded bg-black/80 px-0.5 text-[8px] text-green-400">
-            {sub.time.elapsed}&apos;
+        {substitution?.kind === "out" && (
+          <span className="absolute -bottom-1 -right-1 flex items-center gap-0.5 rounded bg-black/80 px-0.5 text-[8px] font-semibold text-rose-400">
+            <ArrowDown className="h-2.5 w-2.5" strokeWidth={2.5} />
+            {substitution.minute}&apos;
           </span>
         )}
       </div>
@@ -192,7 +282,7 @@ function SubstitutesColumn({
 }: {
   lineup: TeamLineup;
   events: MatchEvent[];
-  onPlayerClick: (id: number) => void;
+  onPlayerClick: (id: number, name: string) => void;
 }) {
   if (lineup.substitutes.length === 0) return null;
 
@@ -203,13 +293,18 @@ function SubstitutesColumn({
       </p>
       <div className="space-y-1.5">
         {lineup.substitutes.map(({ player }) => {
-          const ev = playerEvents(player.id, player.name, lineup.team.id, events);
-          const subIn = ev.find((e) => e.type === "subst");
+          const substitution = getSubstitutionInfo(
+            player.id,
+            player.name,
+            lineup.team.id,
+            events,
+            lineup.team.name
+          );
           return (
             <button
               key={player.id}
               type="button"
-              onClick={() => onPlayerClick(player.id)}
+              onClick={() => onPlayerClick(player.id, player.name)}
               className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left transition-colors hover:bg-white/[0.04]"
             >
               <PlayerAvatar src={player.photo} name={player.name} size={28} />
@@ -219,9 +314,7 @@ function SubstitutesColumn({
                 </p>
                 <p className="text-[9px] text-athletix-text-muted">{player.pos}</p>
               </div>
-              {subIn && (
-                <span className="shrink-0 text-[9px] text-green-400">{subIn.time.elapsed}&apos;</span>
-              )}
+              {substitution?.kind === "in" ? <SubstitutionBadge info={substitution} /> : null}
             </button>
           );
         })}
@@ -250,13 +343,12 @@ export function MatchPitchLineup({ home, away, events = [] }: MatchPitchLineupPr
     "away"
   );
 
-  const goPlayer = (id: number) => {
-    if (id > 0) router.push(`/dashboard/player/${id}`);
+  const goPlayer = (id: number, name: string) => {
+    if (id > 0) router.push(playerRoute(id, name));
   };
 
   return (
     <div className="auth-glass-card overflow-hidden rounded-2xl">
-      {/* Formation header */}
       <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
         <div className="flex items-center gap-2">
           <TeamLogo src={home.team.logo} alt={home.team.name} size={20} />
@@ -274,9 +366,7 @@ export function MatchPitchLineup({ home, away, events = [] }: MatchPitchLineupPr
         </div>
       </div>
 
-      {/* Pitch */}
       <div className="relative mx-auto aspect-[3/4] w-full max-w-lg bg-[#1a3d2e]">
-        {/* Pitch markings */}
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 133" preserveAspectRatio="none">
           <rect x="2" y="2" width="96" height="129" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.4" />
           <line x1="2" y1="66.5" x2="98" y2="66.5" stroke="rgba(255,255,255,0.15)" strokeWidth="0.4" />
@@ -287,42 +377,41 @@ export function MatchPitchLineup({ home, away, events = [] }: MatchPitchLineupPr
           <rect x="34" y="125" width="32" height="6" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="0.3" />
         </svg>
 
-        {/* Away players (top) */}
         {away.startXI.map(({ player }) => {
           const pos = awayPositions.get(player.id);
           if (!pos) return null;
-          const ev = playerEvents(player.id, player.name, away.team.id, events);
           return (
             <PitchPlayer
               key={`away-${player.id}`}
               player={player}
               x={pos.x}
               y={pos.y}
-              events={ev}
-              onClick={() => goPlayer(player.id)}
+              teamId={away.team.id}
+              teamName={away.team.name}
+              events={events}
+              onClick={() => goPlayer(player.id, player.name)}
             />
           );
         })}
 
-        {/* Home players (bottom) */}
         {home.startXI.map(({ player }) => {
           const pos = homePositions.get(player.id);
           if (!pos) return null;
-          const ev = playerEvents(player.id, player.name, home.team.id, events);
           return (
             <PitchPlayer
               key={`home-${player.id}`}
               player={player}
               x={pos.x}
               y={pos.y}
-              events={ev}
-              onClick={() => goPlayer(player.id)}
+              teamId={home.team.id}
+              teamName={home.team.name}
+              events={events}
+              onClick={() => goPlayer(player.id, player.name)}
             />
           );
         })}
       </div>
 
-      {/* Substitutes */}
       <div className="grid gap-4 border-t border-white/[0.06] p-4 sm:grid-cols-2">
         <SubstitutesColumn lineup={home} events={events} onPlayerClick={goPlayer} />
         <SubstitutesColumn lineup={away} events={events} onPlayerClick={goPlayer} />

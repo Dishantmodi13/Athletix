@@ -30,6 +30,8 @@ export interface NormalizedMatch {
   matchday?: number | null;
   /** Which provider served this match (used for detail lookups). */
   source?: string;
+  /** API-Football fixture id for rich match details when source is football-data. */
+  detailFixtureId?: number;
 }
 
 export interface StandingRow {
@@ -78,12 +80,18 @@ export interface MatchScoreSummary {
   away: number | null;
 }
 
+export interface MatchDetailsMeta {
+  status: "full" | "limited" | "pending";
+  message?: string;
+}
+
 export interface MatchDetailsResult {
   match: NormalizedMatch | null;
   statistics: unknown[];
   events: NormalizedMatchEvent[];
   lineups: unknown[];
   scoreSummary?: MatchScoreSummary[];
+  meta?: MatchDetailsMeta;
 }
 
 export interface SearchResult {

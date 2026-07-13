@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { isFinished, isLive, type Match } from "@/lib/football";
+import { isFinished, isLive, matchDetailRouteId, type Match } from "@/lib/football";
 import { formatKickoff, formatMatchDate } from "@/lib/format";
 import { LiveBadge } from "./LiveBadge";
 import { TeamLogo } from "./ui/TeamLogo";
@@ -56,7 +56,7 @@ export function MatchCard({ match, index = 0 }: MatchCardProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: Math.min(index * 0.04, 0.3) }}
       whileHover={{ y: -3 }}
-      onClick={() => router.push(`/dashboard/match/${match.id}`)}
+      onClick={() => router.push(`/dashboard/match/${matchDetailRouteId(match)}`)}
       className="auth-glass-card group w-full rounded-2xl p-4 text-left transition-all duration-300 hover:border-athletix-primary/30 hover:shadow-[0_0_30px_-12px_rgba(59,130,246,0.4)]"
     >
       <div className="mb-3 flex items-center justify-between gap-2">

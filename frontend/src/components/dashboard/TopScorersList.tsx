@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { TopScorer } from "@/lib/football";
+import { playerRoute, type TopScorer } from "@/lib/football";
 import { PlayerAvatar } from "./ui/PlayerAvatar";
 import { TeamLogo } from "./ui/TeamLogo";
 
@@ -29,7 +29,7 @@ export function TopScorersList({
           <button
             key={`${scorer.player.id}-${i}`}
             type="button"
-            onClick={() => router.push(`/dashboard/player/${scorer.player.id}`)}
+            onClick={() => router.push(playerRoute(scorer.player.id, scorer.player.name))}
             className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
           >
             <span className="w-5 text-center text-sm font-semibold text-athletix-text-muted">

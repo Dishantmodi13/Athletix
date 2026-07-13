@@ -55,7 +55,7 @@ export function GuestSignInDialog({
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/auth"
+              href="/dashboard/profile"
               className="auth-primary-btn flex min-h-[48px] flex-1 items-center justify-center rounded-2xl text-sm font-semibold text-white"
               onClick={onClose}
             >

@@ -60,14 +60,11 @@ export async function sendOtp(req: Request, res: Response): Promise<void> {
 
   res.json({
     success: true,
-    message: sendResult.delivered
-      ? "Verification code sent to your email"
-      : "Gmail is not configured — use the development code shown below",
+    message: "Verification code sent to your email",
     data: {
       email,
       expiresInMinutes: env.otpExpiryMinutes,
       delivered: sendResult.delivered,
-      ...(sendResult.devCode ? { devCode: sendResult.devCode } : {}),
     },
   });
 }

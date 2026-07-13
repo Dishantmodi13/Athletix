@@ -4,7 +4,7 @@ import { Search as SearchIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { TeamLogo } from "@/components/dashboard/ui/TeamLogo";
-import { football } from "@/lib/football";
+import { football, playerRoute } from "@/lib/football";
 
 interface TeamResult {
   team: { id: number; name: string; logo: string; country?: string };
@@ -107,7 +107,7 @@ function SearchInner() {
               <button
                 key={p.player.id}
                 type="button"
-                onClick={() => router.push(`/dashboard/player/${p.player.id}`)}
+                onClick={() => router.push(playerRoute(p.player.id, p.player.name))}
                 className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
               >
                 <TeamLogo

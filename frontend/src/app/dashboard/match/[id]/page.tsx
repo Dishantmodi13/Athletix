@@ -57,6 +57,87 @@ function statValue(stats: StatEntry[] | undefined, type: string): number {
   return raw ?? 0;
 }
 
+const STAT_LABELS: Record<string, string> = {
+  "Ball Possession": "Possession",
+  "Total Shots": "Shots",
+  "Shots on Goal": "Shots on Target",
+  "Corner Kicks": "Corners",
+  "Yellow Cards": "Yellow Cards",
+  "Red Cards": "Red Cards",
+  "Goalkeeper Saves": "Saves",
+  "Total passes": "Passes",
+  "Passes accurate": "Accurate Passes",
+  "Passes %": "Pass Accuracy",
+  expected_goals: "Expected Goals (xG)",
+  goals_prevented: "Goals Prevented",
+};
+
+const STAT_PRIORITY = [
+  "Ball Possession",
+  "Total Shots",
+  "Shots on Goal",
+  "Shots off Goal",
+  "Blocked Shots",
+  "Corner Kicks",
+  "Fouls",
+  "Offsides",
+  "Yellow Cards",
+  "Red Cards",
+  "Goalkeeper Saves",
+  "Total passes",
+  "Passes accurate",
+  "Passes %",
+  "expected_goals",
+  "goals_prevented",
+  "Shots insidebox",
+  "Shots outsidebox",
+];
+
+function statLabel(type: string): string {
+  return STAT_LABELS[type] ?? type;
+}
+
+function isPercentStat(type: string): boolean {
+  return type.includes("Possession") || type.includes("Passes %");
+}
+
+function hasStatValue(value: number | string | null | undefined): boolean {
+  if (value === null || value === undefined || value === "") return false;
+  if (typeof value === "number") return true;
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed);
+}
+
+function buildStatRows(
+  homeStats: StatEntry[] | undefined,
+  awayStats: StatEntry[] | undefined
+): Array<{ type: string; label: string; percent: boolean }> {
+  const types = new Set<string>([
+    ...(homeStats ?? []).map((s) => s.type),
+    ...(awayStats ?? []).map((s) => s.type),
+  ]);
+
+  return [...types]
+    .filter((type) => {
+      const home = homeStats?.find((s) => s.type === type)?.value;
+      const away = awayStats?.find((s) => s.type === type)?.value;
+      return hasStatValue(home) || hasStatValue(away);
+    })
+    .sort((a, b) => {
+      const ai = STAT_PRIORITY.indexOf(a);
+      const bi = STAT_PRIORITY.indexOf(b);
+      const ar = ai === -1 ? 999 : ai;
+      const br = bi === -1 ? 999 : bi;
+      if (ar !== br) return ar - br;
+      return a.localeCompare(b);
+    })
+    .map((type) => ({
+      type,
+      label: statLabel(type),
+      percent: isPercentStat(type),
+    }));
+}
+
 function StatBar({
   label,
   home,
@@ -119,18 +200,19 @@ function ScoreSummaryRow({ rows }: { rows: MatchScoreSummary[] }) {
 
 function displayScore(
   goals: { home: number | null; away: number | null },
-  scoreSummary: MatchScoreSummary[]
+  scoreSummary: MatchScoreSummary[],
+  statusShort: string
 ): { home: number; away: number; pens?: MatchScoreSummary } {
-  const ninetymin = scoreSummary.find((r) => r.label === "90 min");
-  if (ninetymin) {
-    const pens = scoreSummary.find((r) => r.label === "Penalties");
-    return {
-      home: ninetymin.home ?? goals.home ?? 0,
-      away: ninetymin.away ?? goals.away ?? 0,
-      pens,
-    };
-  }
-  return { home: goals.home ?? 0, away: goals.away ?? 0 };
+  const pens = scoreSummary.find((r) => r.label === "Penalties");
+
+  return {
+    home: goals.home ?? 0,
+    away: goals.away ?? 0,
+    pens:
+      pens && (statusShort === "PEN" || pens.home != null || pens.away != null)
+        ? pens
+        : undefined,
+  };
 }
 
 function GoalRow({ event, index }: { event: MatchEvent; index: number }) {
@@ -226,14 +308,22 @@ export default function MatchDetailsPage() {
 
   const stats = (data?.statistics as TeamStats[]) ?? [];
   const events = data?.events ?? [];
-  const goals = events.filter((e) => e.type === "Goal");
+  const goals = events.filter(
+    (e) =>
+      e.type === "Goal" &&
+      e.player.name?.trim() &&
+      !e.detail?.toLowerCase().includes("missed") &&
+      !e.detail?.toLowerCase().includes("cancelled")
+  );
   const lineups = (data?.lineups as TeamLineup[]) ?? [];
   const scoreSummary = data?.scoreSummary ?? [];
-  const score = displayScore(match.goals, scoreSummary);
+  const detailMessage = data?.meta?.message;
+  const score = displayScore(match.goals, scoreSummary, match.status.short);
   const live = isLive(match.status.short);
   const finished = isFinished(match.status.short);
   const homeStats = statsForTeam(stats, match.teams.home.name, 0);
   const awayStats = statsForTeam(stats, match.teams.away.name, 1);
+  const statRows = buildStatRows(homeStats, awayStats);
   const showFifaRank = isInternationalMatch(match.league.id, match.league.name);
   const homeFifa = showFifaRank ? getFifaRank(match.teams.home.name) : null;
   const awayFifa = showFifaRank ? getFifaRank(match.teams.away.name) : null;
@@ -394,9 +484,10 @@ export default function MatchDetailsPage() {
               </div>
             )}
             <p className="text-center text-sm text-athletix-text-muted">
-              {finished
-                ? "Individual goal scorers and times are not available for this match from the data provider."
-                : "Goalscorers will appear here once goals are scored."}
+              {detailMessage ??
+                (finished
+                  ? "Individual goal scorers and times are not available for this match from the data provider."
+                  : "Goalscorers will appear here once goals are scored.")}
             </p>
           </div>
         ))}
@@ -410,23 +501,32 @@ export default function MatchDetailsPage() {
             ))}
           </div>
         ) : (
-          <Empty message="No match events yet." />
+          <Empty message={detailMessage ?? "No match events yet."} />
         ))}
 
       {/* Stats */}
       {tab === "stats" &&
-        (stats.length > 0 ? (
+        (statRows.length > 0 ? (
           <div className="auth-glass-card divide-y divide-white/[0.04] rounded-2xl px-5 py-2">
-            <StatBar label="Possession" home={statValue(homeStats, "Ball Possession")} away={statValue(awayStats, "Ball Possession")} percent />
-            <StatBar label="Shots" home={statValue(homeStats, "Total Shots")} away={statValue(awayStats, "Total Shots")} />
-            <StatBar label="Shots on Target" home={statValue(homeStats, "Shots on Goal")} away={statValue(awayStats, "Shots on Goal")} />
-            <StatBar label="Corners" home={statValue(homeStats, "Corner Kicks")} away={statValue(awayStats, "Corner Kicks")} />
-            <StatBar label="Fouls" home={statValue(homeStats, "Fouls")} away={statValue(awayStats, "Fouls")} />
-            <StatBar label="Yellow Cards" home={statValue(homeStats, "Yellow Cards")} away={statValue(awayStats, "Yellow Cards")} />
-            <StatBar label="Red Cards" home={statValue(homeStats, "Red Cards")} away={statValue(awayStats, "Red Cards")} />
+            {statRows.map((row) => (
+              <StatBar
+                key={row.type}
+                label={row.label}
+                home={statValue(homeStats, row.type)}
+                away={statValue(awayStats, row.type)}
+                percent={row.percent}
+              />
+            ))}
           </div>
         ) : (
-          <Empty message="Statistics will appear once the match begins." />
+          <Empty
+            message={
+              detailMessage ??
+              (finished
+                ? "Match statistics are not available for this fixture on the current data plan."
+                : "Statistics will appear once the match begins.")
+            }
+          />
         ))}
 
       {/* Lineups */}
@@ -434,9 +534,16 @@ export default function MatchDetailsPage() {
         (homeLineup && awayLineup ? (
           <MatchPitchLineup home={homeLineup} away={awayLineup} events={events} />
         ) : lineups.length > 0 ? (
-          <MatchLineupList lineups={lineups} />
+          <MatchLineupList lineups={lineups} events={events} />
         ) : (
-          <Empty message="Lineups will be announced before kickoff." />
+          <Empty
+            message={
+              detailMessage ??
+              (finished
+                ? "Lineups are not available for this fixture on the current data plan."
+                : "Lineups will be announced before kickoff.")
+            }
+          />
         ))}
     </div>
   );

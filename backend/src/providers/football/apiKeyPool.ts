@@ -94,6 +94,7 @@ export function parseKeyList(...sources: (string | undefined)[]): string[] {
 export function isRateLimitError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const msg = error.message.toLowerCase();
+  if (msg.includes("do not have access to this season")) return false;
   return (
     msg.includes("rate limit") ||
     msg.includes("request limit") ||

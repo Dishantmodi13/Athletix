@@ -15,10 +15,10 @@ interface OTPFormProps {
   loading: boolean;
   resendCooldown: number;
   hasError: boolean;
-  devCode?: string | null;
   onSubmit: () => void;
   onResend: () => void;
   onBack: () => void;
+  variant?: "auth" | "profile";
 }
 
 export function OTPForm({
@@ -28,10 +28,10 @@ export function OTPForm({
   loading,
   resendCooldown,
   hasError,
-  devCode,
   onSubmit,
   onResend,
   onBack,
+  variant = "auth",
 }: OTPFormProps) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -64,24 +64,8 @@ export function OTPForm({
 
       <AuthHeading
         title="Verify Your Email"
-        subtitle={
-          devCode
-            ? `Gmail is not configured yet. Use the development code below to sign in.`
-            : `We've sent a 6-digit verification code to ${maskedEmail}.`
-        }
+        subtitle={`We've sent a 6-digit verification code to ${maskedEmail}. Check your inbox and spam folder.`}
       />
-
-      {devCode && (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-center">
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-amber-400">
-            Development code
-          </p>
-          <p className="text-2xl font-bold tracking-[0.3em] text-white">{devCode}</p>
-          <p className="mt-2 text-xs text-athletix-text-muted">
-            Add GMAIL_USER and GMAIL_APP_PASSWORD to .env to receive real emails.
-          </p>
-        </div>
-      )}
 
       <OTPInput
         value={otp}
@@ -112,7 +96,7 @@ export function OTPForm({
         loadingText="Verifying..."
         disabled={otp.length !== 6}
       >
-        Verify & Continue
+        Verify {variant === "profile" ? "& Sign In" : "& Continue"}
       </PrimaryButton>
     </motion.form>
   );

@@ -68,7 +68,6 @@ export const COMPETITIONS: CompetitionOption[] = [
   { id: "serie-a", name: "Serie A", sport: "football", region: "Italy", gradient: "from-blue-900/70 to-sky-950" },
   { id: "bundesliga", name: "Bundesliga", sport: "football", region: "Germany", gradient: "from-red-900/70 to-rose-950" },
   { id: "ucl", name: "UEFA Champions League", sport: "football", region: "Europe", gradient: "from-indigo-900/70 to-blue-950" },
-  { id: "uel", name: "Europa League", sport: "football", region: "Europe", gradient: "from-orange-900/70 to-amber-950" },
   { id: "world-cup", name: "FIFA World Cup", sport: "football", region: "Global", gradient: "from-emerald-900/70 to-teal-950" },
   { id: "copa-america", name: "Copa America", sport: "football", region: "South America", gradient: "from-yellow-900/70 to-amber-950" },
   { id: "euro", name: "UEFA Euro", sport: "football", region: "Europe", gradient: "from-blue-900/70 to-cyan-950" },

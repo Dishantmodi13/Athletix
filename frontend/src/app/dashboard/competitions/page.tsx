@@ -13,7 +13,6 @@ const COMPETITION_ACCENTS: Record<number, string> = {
   78: "from-red-600/30 to-rose-700/10",
   61: "from-sky-600/30 to-blue-700/10",
   2: "from-indigo-600/30 to-violet-700/10",
-  3: "from-amber-600/30 to-orange-700/10",
   1: "from-emerald-600/30 to-teal-700/10",
 };
 

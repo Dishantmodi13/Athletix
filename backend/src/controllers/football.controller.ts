@@ -107,7 +107,8 @@ export async function getPlayer(req: Request, res: Response): Promise<void> {
   const season = req.query.season
     ? toInt(req.query.season, "season")
     : resolveFootballSeason();
-  const data = await footballService.getPlayer(id, season);
+  const name = typeof req.query.name === "string" ? req.query.name.trim() : undefined;
+  const data = await footballService.getPlayer(id, season, name);
   res.json({ success: true, data });
 }
 

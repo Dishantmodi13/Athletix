@@ -8,7 +8,7 @@ import { GuestSignInDialog } from "@/components/auth/GuestSignInDialog";
 import { SectionHeader } from "@/components/dashboard/ui/SectionHeader";
 import { TeamLogo } from "@/components/dashboard/ui/TeamLogo";
 import { Favorite, getFavorites } from "@/lib/favorites";
-import { isGuestMode } from "@/lib/auth";
+import { isAuthenticated } from "@/lib/auth";
 
 function favoriteHref(fav: Favorite): string {
   if (fav.type === "competition") {
@@ -20,18 +20,18 @@ function favoriteHref(fav: Favorite): string {
 export default function FavoritesPage() {
   const router = useRouter();
   const [favorites, setFavorites] = useState<Favorite[]>([]);
-  const [guest, setGuest] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
-    setGuest(isGuestMode());
+    setSignedIn(isAuthenticated());
     const sync = () => setFavorites(getFavorites());
     sync();
     window.addEventListener("athletix-favorites-changed", sync);
     return () => window.removeEventListener("athletix-favorites-changed", sync);
   }, []);
 
-  if (guest) {
+  if (!signedIn) {
     return (
       <div className="mx-auto max-w-4xl">
         <SectionHeader title="Favorites" icon={<Heart className="h-5 w-5" />} />

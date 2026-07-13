@@ -47,6 +47,8 @@ coverage/
 
 # User uploads
 backend/uploads/
+backend/data/match-cache/
+backend/data/league-cache/
 
 .turbo
 *.pem

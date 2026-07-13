@@ -16,6 +16,12 @@ export interface Match {
     away: { id: number; name: string; logo: string; winner: boolean | null };
   };
   goals: { home: number | null; away: number | null };
+  detailFixtureId?: number;
+}
+
+/** Route id for match detail pages — always use the canonical fixture id from listings. */
+export function matchDetailRouteId(match: Pick<Match, "id" | "detailFixtureId">): number {
+  return match.id;
 }
 
 export interface StandingRow {
@@ -91,6 +97,41 @@ export interface MatchDetails {
   events: MatchEvent[];
   lineups: unknown[];
   scoreSummary?: MatchScoreSummary[];
+  meta?: {
+    status: "full" | "limited" | "pending";
+    message?: string;
+  };
+}
+
+export interface PlayerDetails {
+  player: {
+    id: number;
+    name: string;
+    firstname: string;
+    lastname: string;
+    age: number | null;
+    nationality: string;
+    height: string | null;
+    weight: string | null;
+    photo: string;
+    birth: { date: string | null; place?: string | null; country?: string | null };
+    position?: string | null;
+    number?: number | null;
+  };
+  statistics: Array<{
+    team: { id: number; name: string; logo: string };
+    league: { name: string; season: number };
+    games: { appearences: number | null; position: string | null };
+    goals: { total: number | null; assists: number | null };
+    cards: { yellow: number | null; red: number | null };
+  }>;
+  source?: string;
+  club?: { name: string; logo: string };
+}
+
+export function playerRoute(id: number, name?: string): string {
+  if (!name?.trim()) return `/dashboard/player/${id}`;
+  return `/dashboard/player/${id}?name=${encodeURIComponent(name.trim())}`;
 }
 
 export interface KnockoutBracket {
@@ -147,7 +188,6 @@ export const LEAGUES = [
   { id: 78, name: "Bundesliga", country: "Germany" },
   { id: 61, name: "Ligue 1", country: "France" },
   { id: 2, name: "Champions League", country: "Europe" },
-  { id: 3, name: "Europa League", country: "Europe" },
 ] as const;
 
 /** All browseable competitions including international tournaments. */
@@ -166,7 +206,7 @@ export const FIFA_WORLD_CUP_ID = 1;
 export const TOP_FIVE_LEAGUE_IDS = [39, 140, 135, 78, 61] as const;
 
 /** European club competitions on the home dashboard. */
-export const EUROPEAN_COMPETITION_IDS = [2, 3] as const;
+export const EUROPEAN_COMPETITION_IDS = [2] as const;
 
 /** International tournaments on the home dashboard. */
 export const INTERNATIONAL_COMPETITION_IDS = [FIFA_WORLD_CUP_ID] as const;
@@ -214,7 +254,10 @@ export const football = {
   matchDetails: (id: number) => get<MatchDetails>(`/match/${id}`),
   team: (id: number) =>
     get<{ team: unknown; fixtures: Match[] }>(`/team/${id}`),
-  player: (id: number) => get<unknown>(`/player/${id}`),
+  player: (id: number, name?: string) =>
+    get<PlayerDetails>(
+      `/player/${id}${name ? `?name=${encodeURIComponent(name)}` : ""}`
+    ),
   search: (q: string) =>
     get<{ teams: unknown[]; players: unknown[] }>(
       `/search?q=${encodeURIComponent(q)}`

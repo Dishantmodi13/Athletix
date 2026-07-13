@@ -32,7 +32,6 @@ export async function sendOtp(email: string) {
     email: string;
     expiresInMinutes: number;
     delivered?: boolean;
-    devCode?: string;
   }>("/auth/send-otp", {
     method: "POST",
     body: JSON.stringify({ email }),

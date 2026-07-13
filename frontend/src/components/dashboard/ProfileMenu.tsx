@@ -7,7 +7,7 @@ import { useUser } from "@/context/UserContext";
 import { getAvatarUrl, getUserInitials } from "@/lib/user";
 
 export function ProfileMenu() {
-  const { user, isGuest, logout } = useUser();
+  const { user, logout } = useUser();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -32,7 +32,7 @@ export function ProfileMenu() {
     };
   }, [open]);
 
-  const label = user?.username ?? (isGuest ? "Guest" : "Profile");
+  const label = user?.username ?? "Profile";
   const avatarUrl = getAvatarUrl(user?.avatar);
 
   return (
@@ -75,7 +75,7 @@ export function ProfileMenu() {
             Profile
           </Link>
 
-          {!isGuest && (
+          {user ? (
             <button
               type="button"
               role="menuitem"
@@ -88,11 +88,9 @@ export function ProfileMenu() {
               <LogOut className="h-4 w-4" />
               Sign out
             </button>
-          )}
-
-          {isGuest && (
+          ) : (
             <Link
-              href="/auth"
+              href="/dashboard/profile"
               role="menuitem"
               onClick={() => setOpen(false)}
               className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-athletix-primary transition-colors hover:bg-white/[0.05]"

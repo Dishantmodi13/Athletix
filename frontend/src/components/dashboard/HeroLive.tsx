@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { isFinished, isLive, type Match } from "@/lib/football";
+import { isFinished, isLive, matchDetailRouteId, type Match } from "@/lib/football";
 import { formatKickoff, formatMatchDate } from "@/lib/format";
 import { LiveBadge } from "./LiveBadge";
 import { TeamLogo } from "./ui/TeamLogo";
@@ -45,7 +45,7 @@ export function HeroLive({ match }: HeroLiveProps) {
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4 }}
-      onClick={() => router.push(`/dashboard/match/${match.id}`)}
+      onClick={() => router.push(`/dashboard/match/${matchDetailRouteId(match)}`)}
       className="relative w-full overflow-hidden rounded-3xl border border-white/[0.08] p-6 text-left sm:p-8"
     >
       <div

@@ -15,6 +15,9 @@ const FOOTBALL_DATA_FIRST_METHODS: ProviderMethod[] = [
   "getFixturesByLeague",
 ];
 
+/** Competitions not covered on football-data.org free tier — prefer API-Football. */
+const API_FOOTBALL_FIRST_LEAGUES = new Set([3]);
+
 /** Prefer football-data when API-Football free tier lacks the active season. */
 function shouldPreferFootballData(method: ProviderMethod, args: unknown[]): boolean {
   if (!FOOTBALL_DATA_FIRST_METHODS.includes(method)) return false;
@@ -37,6 +40,18 @@ function orderProviders(
     FOOTBALL_DATA_FIRST_METHODS.includes(method)
   ) {
     return providers.filter((p) => p.name === "football-data");
+  }
+
+  if (
+    leagueId !== undefined &&
+    API_FOOTBALL_FIRST_LEAGUES.has(leagueId) &&
+    FOOTBALL_DATA_FIRST_METHODS.includes(method)
+  ) {
+    return [...providers].sort((a, b) => {
+      if (a.name === "api-football") return -1;
+      if (b.name === "api-football") return 1;
+      return 0;
+    });
   }
 
   if (!shouldPreferFootballData(method, args)) return providers;

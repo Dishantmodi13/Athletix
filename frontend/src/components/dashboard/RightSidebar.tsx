@@ -1,9 +1,9 @@
 "use client";
 
-import { Crown, Flame, TrendingUp } from "lucide-react";
+import { Flame, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FIFA_WORLD_CUP_ID, football } from "@/lib/football";
+import { FIFA_WORLD_CUP_ID, football, matchDetailRouteId, playerRoute } from "@/lib/football";
 import { formatKickoff, formatMatchDate } from "@/lib/format";
 import { useFetch } from "@/hooks/useFetch";
 import { Skeleton } from "./ui/Skeleton";
@@ -32,36 +32,11 @@ function WidgetShell({
 
 export function RightSidebar() {
   const router = useRouter();
-  const standings = useFetch(() => football.standings(FIFA_WORLD_CUP_ID), []);
   const scorers = useFetch(() => football.topScorers(FIFA_WORLD_CUP_ID), []);
   const upcoming = useFetch(() => football.leagueUpcoming(FIFA_WORLD_CUP_ID, 4), []);
 
-  const leader = standings.data?.[0]?.rows?.[0];
-
   return (
     <aside className="sticky top-16 hidden h-fit w-80 shrink-0 flex-col gap-4 py-6 pr-6 xl:flex">
-      <WidgetShell title="Group Leader" icon={<Crown className="h-4 w-4" />}>
-        {standings.loading ? (
-          <Skeleton className="h-12 w-full" />
-        ) : leader ? (
-          <button
-            type="button"
-            onClick={() => router.push(`/dashboard/team/${leader.team.id}`)}
-            className="flex w-full items-center gap-3 text-left"
-          >
-            <TeamLogo src={leader.team.logo} alt={leader.team.name} size={40} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white">{leader.team.name}</p>
-              <p className="text-xs text-athletix-text-muted">
-                {standings.data?.[0]?.name ?? "FIFA World Cup"} · {leader.points} pts
-              </p>
-            </div>
-          </button>
-        ) : (
-          <p className="text-xs text-athletix-text-muted">Unavailable</p>
-        )}
-      </WidgetShell>
-
       <WidgetShell title="Upcoming World Cup" icon={<TrendingUp className="h-4 w-4" />}>
         <div className="space-y-3">
           {upcoming.loading ? (
@@ -74,7 +49,7 @@ export function RightSidebar() {
               <button
                 key={m.id}
                 type="button"
-                onClick={() => router.push(`/dashboard/match/${m.id}`)}
+                onClick={() => router.push(`/dashboard/match/${matchDetailRouteId(m)}`)}
                 className="flex w-full items-center justify-between gap-2 text-left"
               >
                 <div className="flex min-w-0 items-center gap-1.5">
@@ -111,7 +86,7 @@ export function RightSidebar() {
               <button
                 key={s.player.id}
                 type="button"
-                onClick={() => router.push(`/dashboard/player/${s.player.id}`)}
+                onClick={() => router.push(playerRoute(s.player.id, s.player.name))}
                 className="flex w-full items-center gap-2.5 text-left"
               >
                 <span className="w-4 text-xs font-semibold text-athletix-text-muted">{i + 1}</span>

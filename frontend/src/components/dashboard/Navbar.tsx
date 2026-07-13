@@ -1,60 +1,56 @@
 "use client";
 
-import { Bell, Search } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { usePathname } from "next/navigation";
 import { AthletixLogo } from "@/components/auth/AthletixLogo";
 import { ProfileMenu } from "@/components/dashboard/ProfileMenu";
+import { CRICKET_DASHBOARD, FOOTBALL_DASHBOARD, isCricketRoute, isFootballRoute } from "@/lib/sports";
+
+const SPORT_TABS = [
+  { label: "Football", href: FOOTBALL_DASHBOARD },
+  { label: "Cricket", href: CRICKET_DASHBOARD },
+] as const;
 
 export function Navbar() {
-  const router = useRouter();
-  const [query, setQuery] = useState("");
-
-  const handleSearch = (e: FormEvent) => {
-    e.preventDefault();
-    if (query.trim().length >= 3) {
-      router.push(`/dashboard/search?q=${encodeURIComponent(query.trim())}`);
-    }
-  };
+  const pathname = usePathname();
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-athletix-bg-deep/80 backdrop-blur-xl">
       <div className="flex h-16 items-center gap-4 px-4 sm:px-6">
         <div className="lg:hidden">
-          <Link href="/dashboard">
+          <Link href={isCricketRoute(pathname) ? CRICKET_DASHBOARD : FOOTBALL_DASHBOARD}>
             <AthletixLogo size="sm" />
           </Link>
         </div>
 
-        <form onSubmit={handleSearch} className="relative ml-auto hidden max-w-md flex-1 sm:block lg:ml-0">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-athletix-text-muted" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search teams, players, competitions..."
-            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] py-2.5 pl-10 pr-4 text-sm text-white outline-none transition-colors placeholder:text-athletix-text-muted focus:border-athletix-primary/40"
-            aria-label="Search"
-          />
-        </form>
+        <nav
+          className="flex items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-1"
+          aria-label="Sports"
+        >
+          {SPORT_TABS.map((tab) => {
+            const active =
+              tab.href === CRICKET_DASHBOARD
+                ? isCricketRoute(pathname)
+                : isFootballRoute(pathname);
 
-        <div className="ml-auto flex items-center gap-2 sm:ml-0">
-          <Link
-            href="/dashboard/search"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-athletix-text-muted transition-colors hover:text-white sm:hidden"
-            aria-label="Search"
-          >
-            <Search className="h-[18px] w-[18px]" />
-          </Link>
-          <button
-            type="button"
-            className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-athletix-text-muted transition-colors hover:text-white"
-            aria-label="Notifications"
-          >
-            <Bell className="h-[18px] w-[18px]" />
-            <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-athletix-secondary" />
-          </button>
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                  active
+                    ? "bg-athletix-primary/20 text-white shadow-[inset_0_0_0_1px_rgba(59,130,246,0.3)]"
+                    : "text-athletix-text-muted hover:bg-white/[0.04] hover:text-white"
+                }`}
+                aria-current={active ? "page" : undefined}
+              >
+                {tab.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="ml-auto">
           <ProfileMenu />
         </div>
       </div>

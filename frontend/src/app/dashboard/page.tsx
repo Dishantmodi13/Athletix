@@ -177,7 +177,7 @@ export default function DashboardHome() {
         <section>
           <SectionHeader title="Today's Matches" icon={<CalendarDays className="h-5 w-5" />} />
           <p className="mb-4 text-xs text-athletix-text-muted">
-            Top 5 leagues, Champions League, Europa League, and international football only.
+            Top 5 leagues, Champions League, and international football only.
           </p>
           {today.loading ? (
             <div className="grid gap-3 sm:grid-cols-2">

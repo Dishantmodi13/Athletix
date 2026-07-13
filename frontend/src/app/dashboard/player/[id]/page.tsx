@@ -2,33 +2,11 @@
 
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Skeleton } from "@/components/dashboard/ui/Skeleton";
 import { TeamLogo } from "@/components/dashboard/ui/TeamLogo";
 import { useFetch } from "@/hooks/useFetch";
-import { football } from "@/lib/football";
-
-interface PlayerData {
-  player: {
-    id: number;
-    name: string;
-    firstname: string;
-    lastname: string;
-    age: number;
-    nationality: string;
-    height: string | null;
-    weight: string | null;
-    photo: string;
-    birth: { date: string | null };
-  };
-  statistics: Array<{
-    team: { id: number; name: string; logo: string };
-    league: { name: string; season: number };
-    games: { appearences: number | null; position: string | null };
-    goals: { total: number | null; assists: number | null };
-    cards: { yellow: number | null; red: number | null };
-  }>;
-}
+import { football, type PlayerDetails } from "@/lib/football";
 
 function StatTile({ label, value }: { label: string; value: string | number }) {
   return (
@@ -50,10 +28,12 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 export default function PlayerPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const id = Number(params.id);
+  const name = searchParams.get("name") ?? undefined;
 
-  const { data, loading } = useFetch(() => football.player(id), [id]);
+  const { data, loading } = useFetch(() => football.player(id, name), [id, name]);
 
   if (loading) {
     return (
@@ -64,7 +44,7 @@ export default function PlayerPage() {
     );
   }
 
-  const player = data as PlayerData | undefined;
+  const player = data as PlayerDetails | undefined;
   if (!player?.player) {
     return (
       <div className="mx-auto max-w-3xl py-16 text-center text-sm text-athletix-text-muted">
@@ -73,14 +53,24 @@ export default function PlayerPage() {
     );
   }
 
-  const stat = player.statistics?.[0];
-  const totalGoals = player.statistics?.reduce((sum, s) => sum + (s.goals.total ?? 0), 0) ?? 0;
-  const totalAssists = player.statistics?.reduce((sum, s) => sum + (s.goals.assists ?? 0), 0) ?? 0;
-  const totalApps = player.statistics?.reduce((sum, s) => sum + (s.games.appearences ?? 0), 0) ?? 0;
-  const totalCards = player.statistics?.reduce(
+  const tournamentStats = player.statistics.filter(
+    (s) => s.league.name && s.league.name !== "Club"
+  );
+  const totalGoals = tournamentStats.reduce((sum, s) => sum + (s.goals.total ?? 0), 0);
+  const totalAssists = tournamentStats.reduce((sum, s) => sum + (s.goals.assists ?? 0), 0);
+  const totalApps = tournamentStats.reduce((sum, s) => sum + (s.games.appearences ?? 0), 0);
+  const totalCards = tournamentStats.reduce(
     (sum, s) => sum + (s.cards.yellow ?? 0) + (s.cards.red ?? 0),
     0
-  ) ?? 0;
+  );
+  const hasSeasonStats = tournamentStats.some(
+    (s) =>
+      (s.goals.total ?? 0) > 0 ||
+      (s.goals.assists ?? 0) > 0 ||
+      (s.games.appearences ?? 0) > 0
+  );
+  const clubName = player.club?.name;
+  const clubLogo = player.club?.logo;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -105,36 +95,78 @@ export default function PlayerPage() {
           }}
         />
         <div className="relative flex items-center gap-5">
-          <TeamLogo src={player.player.photo} alt={player.player.name} size={88} className="rounded-full" />
+          <TeamLogo
+            src={player.player.photo}
+            alt={player.player.name}
+            size={88}
+            className="rounded-full"
+          />
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
               {player.player.name}
             </h1>
             <p className="mt-1 text-sm text-athletix-text-muted">{player.player.nationality}</p>
-            {stat?.team && (
+            {clubName && (
               <div className="mt-2 flex items-center gap-2">
-                <TeamLogo src={stat.team.logo} alt={stat.team.name} size={20} />
-                <span className="text-xs text-athletix-text-secondary">{stat.team.name}</span>
+                {clubLogo ? <TeamLogo src={clubLogo} alt={clubName} size={20} /> : null}
+                <span className="text-xs text-athletix-text-secondary">{clubName}</span>
               </div>
             )}
           </div>
         </div>
       </motion.div>
 
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Goals" value={totalGoals} />
-        <StatTile label="Assists" value={totalAssists} />
-        <StatTile label="Appearances" value={totalApps} />
-        <StatTile label="Cards" value={totalCards} />
-      </div>
+      {hasSeasonStats ? (
+        <>
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatTile label="Goals" value={totalGoals} />
+            <StatTile label="Assists" value={totalAssists} />
+            <StatTile label="Appearances" value={totalApps} />
+            <StatTile label="Cards" value={totalCards} />
+          </div>
+          <div className="auth-glass-card mb-8 divide-y divide-white/[0.04] rounded-2xl px-5 py-2">
+            {tournamentStats.map((row) => (
+              <div key={`${row.league.name}-${row.league.season}`} className="py-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {row.team.logo ? (
+                      <TeamLogo src={row.team.logo} alt={row.team.name} size={18} />
+                    ) : null}
+                    <span className="text-sm font-medium text-white">
+                      {row.league.name}
+                      {row.league.season ? ` ${row.league.season}` : ""}
+                    </span>
+                  </div>
+                  <span className="text-xs text-athletix-text-muted">{row.team.name}</span>
+                </div>
+                <div className="flex flex-wrap gap-4 text-xs text-athletix-text-secondary">
+                  <span>{row.games.appearences ?? 0} apps</span>
+                  <span>{row.goals.total ?? 0} goals</span>
+                  <span>{row.goals.assists ?? 0} assists</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="mb-6 text-center text-xs text-athletix-text-muted">
+          Tournament statistics are not available for this player yet.
+        </p>
+      )}
 
       <div className="auth-glass-card rounded-2xl px-5 py-2">
-        <InfoRow label="Age" value={String(player.player.age ?? "—")} />
-        <InfoRow label="Nationality" value={player.player.nationality ?? "—"} />
+        <InfoRow label="Age" value={player.player.age != null ? String(player.player.age) : "—"} />
+        <InfoRow label="Nationality" value={player.player.nationality || "—"} />
         <InfoRow label="Height" value={player.player.height ?? "—"} />
         <InfoRow label="Weight" value={player.player.weight ?? "—"} />
-        <InfoRow label="Position" value={stat?.games.position ?? "—"} />
-        <InfoRow label="Club" value={stat?.team.name ?? "—"} />
+        <InfoRow
+          label="Position"
+          value={player.player.position ?? tournamentStats[0]?.games.position ?? "—"}
+        />
+        <InfoRow label="Club" value={clubName ?? "—"} />
+        {player.player.birth.date && (
+          <InfoRow label="Born" value={player.player.birth.date} />
+        )}
       </div>
     </div>
   );

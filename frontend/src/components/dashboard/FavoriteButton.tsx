@@ -4,7 +4,7 @@ import { Heart } from "lucide-react";
 import { useEffect, useState } from "react";
 import { GuestSignInDialog } from "@/components/auth/GuestSignInDialog";
 import { Favorite, isFavorite, toggleFavorite } from "@/lib/favorites";
-import { isGuestMode } from "@/lib/auth";
+import { isAuthenticated } from "@/lib/auth";
 
 interface FavoriteButtonProps {
   favorite: Favorite;
@@ -19,7 +19,7 @@ export function FavoriteButton({ favorite }: FavoriteButtonProps) {
   }, [favorite.type, favorite.id]);
 
   const handleClick = () => {
-    if (isGuestMode()) {
+    if (!isAuthenticated()) {
       setDialogOpen(true);
       return;
     }

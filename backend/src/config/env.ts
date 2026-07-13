@@ -24,6 +24,16 @@ export const env = {
   otpExpiryMinutes: Number(process.env.OTP_EXPIRY_MINUTES ?? 10),
   gmailUser: process.env.GMAIL_USER ?? "",
   gmailAppPassword: process.env.GMAIL_APP_PASSWORD ?? "",
+  /** Resend.com API key — alternative to Gmail SMTP (https://resend.com) */
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
+  resendFrom: process.env.RESEND_FROM ?? "",
+  /** Generic SMTP relay (Brevo, Mailgun, etc.) */
+  smtpHost: process.env.SMTP_HOST ?? "",
+  smtpPort: Number(process.env.SMTP_PORT ?? 587),
+  smtpSecure: process.env.SMTP_SECURE === "true",
+  smtpUser: process.env.SMTP_USER ?? "",
+  smtpPass: process.env.SMTP_PASS ?? "",
+  smtpFrom: process.env.SMTP_FROM ?? "",
   /** API-Football (api-sports.io) — supports comma-separated keys for rotation. */
   footballApiKeys: process.env.FOOTBALL_API_KEYS ?? process.env.FOOTBALL_API_KEY ?? "",
   /** @deprecated Use FOOTBALL_API_KEYS — kept for backward compatibility. */
@@ -34,4 +44,6 @@ export const env = {
   footballDataApiKeys: process.env.FOOTBALL_DATA_API_KEYS ?? "",
   /** Default season for league stats (e.g. 2025 for the 2025/26 season). */
   footballDefaultSeason: Number(process.env.FOOTBALL_DEFAULT_SEASON ?? 2025),
+  /** TheSportsDB — free key "3" works; optional premium key for fuller data */
+  theSportsDbApiKey: process.env.THESPORTSDB_API_KEY ?? "3",
 };

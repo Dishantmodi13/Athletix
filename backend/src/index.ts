@@ -1,22 +1,28 @@
 import app from "./app";
 import { connectDB } from "./config/db";
 import { env } from "./config/env";
-import { isEmailConfigured } from "./services/otp.service";
+import { warmFeaturedLeagueCaches } from "./services/leagueDataCache";
+import { isEmailConfigured, getEmailSetupHint } from "./services/otp.service";
 
 async function startServer(): Promise<void> {
   await connectDB();
 
   if (!isEmailConfigured()) {
     console.warn(
-      "[Athletix] Gmail not configured — OTP emails will NOT be sent.\n" +
-        "  Add GMAIL_USER and GMAIL_APP_PASSWORD to your .env file.\n" +
-        "  Create an App Password: https://myaccount.google.com/apppasswords\n" +
-        "  In development, OTP codes are shown on the login screen instead."
+      "[Athletix] Email not configured — OTP emails will NOT be sent.\n" +
+        "  Option A (Gmail): set GMAIL_USER + GMAIL_APP_PASSWORD in .env\n" +
+        "    App Password: https://myaccount.google.com/apppasswords\n" +
+        "  Option B (Resend): set RESEND_API_KEY in .env (free at https://resend.com)"
     );
+  } else {
+    console.log(`[Athletix] OTP email provider: ${getEmailSetupHint()}`);
   }
 
   app.listen(env.port, () => {
     console.log(`Athletix API running on http://localhost:${env.port}`);
+    setTimeout(() => {
+      void warmFeaturedLeagueCaches();
+    }, 15_000);
   });
 }
 
