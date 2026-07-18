@@ -10,7 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { clearAuthSession, isAuthenticated, isGuestMode } from "@/lib/auth";
+import { disableGuestMode, clearAuthSession, isAuthenticated, isGuestMode, AUTH_CHANGE_EVENT } from "@/lib/auth";
+import { setFollowedTeams } from "@/lib/favorites";
 import {
   fetchCurrentUser,
   loadUserProfile,
@@ -37,32 +38,46 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [isGuest, setIsGuest] = useState(false);
 
   const refreshUser = useCallback(async () => {
-    if (!isAuthenticated() || isGuestMode()) {
+    if (!isAuthenticated()) {
       setUser(null);
       setIsGuest(isGuestMode());
       return;
     }
 
+    if (isGuestMode()) {
+      disableGuestMode();
+      setIsGuest(false);
+    }
+
+    const cached = loadUserProfile();
+    if (cached) setUser(cached);
+
     try {
       const profile = await fetchCurrentUser();
       setUser(profile);
       saveUserProfile(profile);
+      setFollowedTeams(profile.followedTeams ?? []);
       setIsGuest(false);
     } catch {
-      const cached = loadUserProfile();
-      setUser(cached);
+      if (!cached) setUser(null);
     }
   }, []);
 
   useEffect(() => {
     const guest = isGuestMode();
-    setIsGuest(guest);
+    const authenticated = isAuthenticated();
 
-    if (guest || !isAuthenticated()) {
+    if (!authenticated) {
+      setIsGuest(guest);
       setUser(null);
       setLoading(false);
       return;
     }
+
+    if (guest) {
+      disableGuestMode();
+    }
+    setIsGuest(false);
 
     const cached = loadUserProfile();
     if (cached) setUser(cached);
@@ -71,12 +86,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
       .then((profile) => {
         setUser(profile);
         saveUserProfile(profile);
+        setFollowedTeams(profile.followedTeams ?? []);
       })
       .catch(() => {
         if (!cached) setUser(null);
       })
       .finally(() => setLoading(false));
-  }, []);
+
+    const onAuthChange = () => {
+      void refreshUser();
+    };
+
+    window.addEventListener(AUTH_CHANGE_EVENT, onAuthChange);
+    return () => window.removeEventListener(AUTH_CHANGE_EVENT, onAuthChange);
+  }, [refreshUser]);
 
   const updateProfile = useCallback(async (payload: UpdateProfilePayload) => {
     const updated = await updateUserProfile(payload);

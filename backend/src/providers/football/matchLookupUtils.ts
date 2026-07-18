@@ -2,7 +2,7 @@ import { cache } from "../../services/cache.service";
 import type { NormalizedMatch, FootballProvider } from "./football.types";
 import { apiFootballProvider } from "./apiFootball.provider";
 import { isRateLimitError } from "./apiKeyPool";
-import { WORLD_CUP_LEAGUE_ID } from "./leagueMap";
+import { WORLD_CUP_LEAGUE_ID, WORLD_CUP_LEAGUE_LOGO, FIFA_WORLD_CUP_NAME } from "./leagueMap";
 import { findApiFootballIdFromTheSportsDb } from "./theSportsDb.provider";
 
 const TEAM_ALIASES: Record<string, string> = {
@@ -69,6 +69,105 @@ function datesCompatible(fixture: NormalizedMatch, target: NormalizedMatch): boo
 
 function fixturesMatch(fixture: NormalizedMatch, target: NormalizedMatch): boolean {
   return teamsMatch(fixture, target) && datesCompatible(fixture, target);
+}
+
+const LIVE_STATUSES = new Set(["1H", "2H", "HT", "ET", "BT", "P", "LIVE"]);
+
+/** Stable key for the same kickoff regardless of provider fixture id. */
+export function matchFixtureKey(match: NormalizedMatch): string {
+  const home = normalizeTeamName(match.teams.home.name);
+  const away = normalizeTeamName(match.teams.away.name);
+  const [a, b] = [home, away].sort();
+  const day = match.date.split("T")[0]!;
+  return `${a}|${b}|${day}`;
+}
+
+function enrichDedupedMatch(primary: NormalizedMatch, secondary: NormalizedMatch): NormalizedMatch {
+  const afId =
+    primary.source === "api-football"
+      ? primary.id
+      : secondary.source === "api-football"
+        ? secondary.id
+        : undefined;
+
+  const detailFixtureId =
+    primary.detailFixtureId ?? (afId && afId !== primary.id ? afId : undefined);
+
+  const fdMatch =
+    primary.source === "football-data"
+      ? primary
+      : secondary.source === "football-data"
+        ? secondary
+        : null;
+
+  let league = primary.league;
+  if (primary.league.id === WORLD_CUP_LEAGUE_ID) {
+    const candidateLogo = fdMatch?.league.logo || primary.league.logo || secondary.league.logo;
+    league = {
+      ...primary.league,
+      name: FIFA_WORLD_CUP_NAME,
+      logo:
+        candidateLogo && !candidateLogo.includes("api-sports.io")
+          ? candidateLogo
+          : WORLD_CUP_LEAGUE_LOGO,
+    };
+  }
+
+  return { ...primary, detailFixtureId, league };
+}
+
+function preferMatch(a: NormalizedMatch, b: NormalizedMatch): NormalizedMatch {
+  let chosen: NormalizedMatch;
+  let other: NormalizedMatch;
+
+  const aLive = LIVE_STATUSES.has(a.status.short);
+  const bLive = LIVE_STATUSES.has(b.status.short);
+  if (aLive && !bLive) {
+    chosen = a;
+    other = b;
+  } else if (bLive && !aLive) {
+    chosen = b;
+    other = a;
+  } else if (a.league.id === WORLD_CUP_LEAGUE_ID && b.league.id === WORLD_CUP_LEAGUE_ID) {
+    if (a.source === "football-data" && b.source !== "football-data") {
+      chosen = a;
+      other = b;
+    } else if (b.source === "football-data" && a.source !== "football-data") {
+      chosen = b;
+      other = a;
+    } else {
+      chosen = a;
+      other = b;
+    }
+  } else if (a.source === "api-football" && b.source !== "api-football") {
+    chosen = a;
+    other = b;
+  } else if (b.source === "api-football" && a.source !== "api-football") {
+    chosen = b;
+    other = a;
+  } else if (a.detailFixtureId && a.detailFixtureId !== a.id) {
+    chosen = a;
+    other = b;
+  } else if (b.detailFixtureId && b.detailFixtureId !== b.id) {
+    chosen = b;
+    other = a;
+  } else {
+    chosen = a;
+    other = b;
+  }
+
+  return enrichDedupedMatch(chosen, other);
+}
+
+/** Collapse cross-provider duplicates (e.g. football-data vs API-Football ids). */
+export function dedupeMatchesByFixture<T extends NormalizedMatch>(matches: T[]): T[] {
+  const byKey = new Map<string, T>();
+  for (const match of matches) {
+    const key = matchFixtureKey(match);
+    const existing = byKey.get(key);
+    byKey.set(key, existing ? (preferMatch(existing, match) as T) : match);
+  }
+  return [...byKey.values()];
 }
 
 function datesAround(isoDate: string): string[] {

@@ -1,6 +1,11 @@
 /** API-Football league id for the FIFA World Cup. */
 export const WORLD_CUP_LEAGUE_ID = 1;
 
+/** Reliable World Cup crest used across providers. */
+export const WORLD_CUP_LEAGUE_LOGO = "https://crests.football-data.org/wm26.png";
+
+export const FIFA_WORLD_CUP_NAME = "FIFA World Cup";
+
 /**
  * Maps API-Football league IDs → football-data.org competition IDs.
  * @see https://docs.football-data.org/general/v4/competition.html

@@ -2,8 +2,9 @@
 
 import { motion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { OnboardingPersistedState } from "@/types/onboarding";
+import { markSessionStarted } from "@/lib/session";
 import { AnimatedButton } from "../AnimatedButton";
 import { SportsDNACard } from "../SportsDNACard";
 
@@ -12,6 +13,8 @@ interface StepWelcomeProps {
 }
 
 export function StepWelcome({ state }: StepWelcomeProps) {
+  const router = useRouter();
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
       <motion.div
@@ -50,11 +53,15 @@ export function StepWelcome({ state }: StepWelcomeProps) {
         transition={{ delay: 1 }}
         className="mt-10"
       >
-        <Link href="/dashboard">
-          <AnimatedButton className="min-w-[200px] px-10">
-            Enter Athletix
-          </AnimatedButton>
-        </Link>
+        <AnimatedButton
+          className="min-w-[200px] px-10"
+          onClick={() => {
+            markSessionStarted();
+            router.push("/dashboard");
+          }}
+        >
+          Enter Athletix
+        </AnimatedButton>
       </motion.div>
     </div>
   );

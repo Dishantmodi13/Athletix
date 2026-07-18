@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { markSessionStarted } from "@/lib/session";
 import { AthletixLogo } from "./AthletixLogo";
 import { AuthHeading } from "./ErrorMessage";
 import { PrimaryButton } from "./PrimaryButton";
@@ -31,7 +32,13 @@ export function AuthCard() {
           subtitle="Live scores, standings, and match insights from the world's biggest competitions."
         />
 
-        <PrimaryButton type="button" onClick={() => router.push("/dashboard")}>
+        <PrimaryButton
+          type="button"
+          onClick={() => {
+            markSessionStarted();
+            router.push("/dashboard");
+          }}
+        >
           Get Started
         </PrimaryButton>
       </div>

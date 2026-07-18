@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { GuestSignInDialog } from "@/components/auth/GuestSignInDialog";
 import { SectionHeader } from "@/components/dashboard/ui/SectionHeader";
 import { TeamLogo } from "@/components/dashboard/ui/TeamLogo";
-import { Favorite, getFavorites } from "@/lib/favorites";
+import { Favorite, FAVORITES_CHANGED_EVENT, getFavorites } from "@/lib/favorites";
 import { isAuthenticated } from "@/lib/auth";
 
 function favoriteHref(fav: Favorite): string {
@@ -27,8 +27,8 @@ export default function FavoritesPage() {
     setSignedIn(isAuthenticated());
     const sync = () => setFavorites(getFavorites());
     sync();
-    window.addEventListener("athletix-favorites-changed", sync);
-    return () => window.removeEventListener("athletix-favorites-changed", sync);
+    window.addEventListener(FAVORITES_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(FAVORITES_CHANGED_EVENT, sync);
   }, []);
 
   if (!signedIn) {

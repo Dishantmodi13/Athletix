@@ -3,25 +3,32 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AthletixLogo } from "@/components/auth/AthletixLogo";
-import { SIDEBAR_ITEMS } from "./nav-items";
+import { CRICKET_DASHBOARD, FOOTBALL_DASHBOARD, isCricketRoute } from "@/lib/sports";
+import { CRICKET_SIDEBAR_ITEMS, SIDEBAR_ITEMS } from "./nav-items";
+
+export function isNavItemActive(pathname: string, href: string): boolean {
+  if (href === FOOTBALL_DASHBOARD || href === CRICKET_DASHBOARD) {
+    return pathname === href;
+  }
+  return pathname.startsWith(href);
+}
 
 export function Sidebar() {
   const pathname = usePathname();
+  const cricket = isCricketRoute(pathname);
+  const items = cricket ? CRICKET_SIDEBAR_ITEMS : SIDEBAR_ITEMS;
 
   return (
     <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-white/[0.06] bg-athletix-bg-mid/40 px-4 py-6 lg:flex">
       <div className="mb-8 px-2">
-        <Link href="/dashboard">
+        <Link href={cricket ? CRICKET_DASHBOARD : FOOTBALL_DASHBOARD}>
           <AthletixLogo size="sm" />
         </Link>
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">
-        {SIDEBAR_ITEMS.map((item) => {
-          const active =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname.startsWith(item.href);
+        {items.map((item) => {
+          const active = isNavItemActive(pathname, item.href);
           const Icon = item.icon;
 
           return (

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AppError } from "../middleware/errorHandler";
 import { footballService } from "../services/football.service";
 import { resolveFootballSeason } from "../utils/footballSeason";
+import { parseFollowedTeamsQuery } from "../utils/followedTeams";
 
 function todayISO(): string {
   return new Date().toISOString().split("T")[0];
@@ -17,6 +18,20 @@ function toInt(value: unknown, field: string): number {
 
 export async function getLive(_req: Request, res: Response): Promise<void> {
   const data = await footballService.getLiveMatches();
+  res.json({ success: true, data });
+}
+
+export async function getHome(req: Request, res: Response): Promise<void> {
+  const league = req.query.league ? toInt(req.query.league, "league") : undefined;
+  const data = await footballService.getHomeDashboard(league);
+  res.json({ success: true, data });
+}
+
+export async function getFollowedMatches(req: Request, res: Response): Promise<void> {
+  const teams = parseFollowedTeamsQuery(
+    typeof req.query.teams === "string" ? req.query.teams : undefined
+  );
+  const data = await footballService.getFollowedTeamMatches(teams);
   res.json({ success: true, data });
 }
 
@@ -95,11 +110,9 @@ export async function getTeam(req: Request, res: Response): Promise<void> {
   const season = req.query.season
     ? toInt(req.query.season, "season")
     : resolveFootballSeason();
-  const [team, fixtures] = await Promise.all([
-    footballService.getTeam(id),
-    footballService.getTeamFixtures(id, season),
-  ]);
-  res.json({ success: true, data: { team, fixtures } });
+  const name = typeof req.query.name === "string" ? req.query.name.trim() : undefined;
+  const data = await footballService.getTeamPage(id, season, name);
+  res.json({ success: true, data });
 }
 
 export async function getPlayer(req: Request, res: Response): Promise<void> {

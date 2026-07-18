@@ -1,5 +1,6 @@
 import type { NormalizedMatch, NormalizedMatchEvent } from "./football.types";
 import type { NormalizedLineup } from "./lineupUtils";
+import { synthesizeLineupGrids } from "./lineupUtils";
 
 interface TsdbTimelineRow {
   strTimeline?: string;
@@ -173,10 +174,14 @@ export function normalizeTheSportsDbLineups(
 
   const result: NormalizedLineup[] = [];
   if (homeRows.length) {
-    result.push(mapSide(homeRows, match.teams.home, event.strHomeTeamBadge ?? ""));
+    result.push(
+      synthesizeLineupGrids(mapSide(homeRows, match.teams.home, event.strHomeTeamBadge ?? ""))
+    );
   }
   if (awayRows.length) {
-    result.push(mapSide(awayRows, match.teams.away, event.strAwayTeamBadge ?? ""));
+    result.push(
+      synthesizeLineupGrids(mapSide(awayRows, match.teams.away, event.strAwayTeamBadge ?? ""))
+    );
   }
 
   return result;

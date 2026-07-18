@@ -51,6 +51,28 @@ class MemoryCache {
     }
   }
 
+  /** Return stale data immediately while refreshing in the background. */
+  async wrapStale<T>(
+    key: string,
+    ttlSeconds: number,
+    loader: () => Promise<T>
+  ): Promise<T> {
+    const cached = this.get<T>(key);
+    if (cached !== undefined) return cached;
+
+    const stale = this.getStale<T>(key);
+    if (stale !== undefined) {
+      void loader()
+        .then((value) => this.set(key, value, ttlSeconds))
+        .catch(() => undefined);
+      return stale;
+    }
+
+    const value = await loader();
+    this.set(key, value, ttlSeconds);
+    return value;
+  }
+
   clear(): void {
     this.store.clear();
   }

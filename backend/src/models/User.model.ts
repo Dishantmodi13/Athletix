@@ -1,5 +1,11 @@
 import { Schema, model, models } from "mongoose";
 
+export interface FollowedTeam {
+  id: number;
+  name: string;
+  logo?: string | null;
+}
+
 export interface IUser {
   username: string;
   email: string;
@@ -8,9 +14,19 @@ export interface IUser {
   state?: string | null;
   country?: string | null;
   avatar?: string | null;
+  followedTeams: FollowedTeam[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+const followedTeamSchema = new Schema<FollowedTeam>(
+  {
+    id: { type: Number, required: true },
+    name: { type: String, required: true, trim: true },
+    logo: { type: String, default: null },
+  },
+  { _id: false }
+);
 
 const userSchema = new Schema<IUser>(
   {
@@ -21,6 +37,7 @@ const userSchema = new Schema<IUser>(
     state: { type: String, default: null },
     country: { type: String, default: null },
     avatar: { type: String, default: null },
+    followedTeams: { type: [followedTeamSchema], default: [] },
   },
   { timestamps: true }
 );

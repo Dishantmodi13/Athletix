@@ -2,6 +2,8 @@ import { WORLD_CUP_LEAGUE_ID } from "../providers/football/leagueMap";
 import { cache } from "./cache.service";
 import { persistentLeagueCache } from "./persistentLeagueCache";
 import { footballProviderManager } from "../providers/football/footballProvider.manager";
+import { footballDataProvider } from "../providers/football/footballData.provider";
+import { loadTopAssists } from "../providers/football/topAssistsResolver";
 import { resolveFootballSeason } from "../utils/footballSeason";
 
 /** Leagues that should keep standings/fixtures/scorers available offline. */
@@ -156,6 +158,25 @@ export async function warmFeaturedLeagueCaches(): Promise<void> {
         // Try the next season year.
       }
 
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+    }
+  }
+
+  if (footballDataProvider.isAvailable()) {
+    const wcSeason = resolveFootballSeason(undefined, WORLD_CUP_LEAGUE_ID);
+    for (const league of FEATURED_LEAGUE_IDS) {
+      const resolvedSeason =
+        league === WORLD_CUP_LEAGUE_ID
+          ? wcSeason
+          : resolveFootballSeason(undefined, league);
+      try {
+        await loadTopAssists(league, resolvedSeason);
+        console.log(
+          `[Football] Warmed top assists cache for league ${league} (${resolvedSeason})`
+        );
+      } catch {
+        // Best-effort — first user request will build the cache.
+      }
       await new Promise((resolve) => setTimeout(resolve, 2500));
     }
   }

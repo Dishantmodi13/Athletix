@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { isFinished, isLive, matchDetailRouteId, type Match } from "@/lib/football";
+import { isFinished, isLive, leagueDisplayLogo, leagueDisplayName, matchDetailRouteId, type Match } from "@/lib/football";
 import { formatKickoff, formatMatchDate } from "@/lib/format";
 import { LiveBadge } from "./LiveBadge";
 import { TeamLogo } from "./ui/TeamLogo";
@@ -57,9 +57,9 @@ export function HeroLive({ match }: HeroLiveProps) {
       />
       <div className="relative">
         <div className="mb-6 flex items-center justify-center gap-2">
-          <TeamLogo src={match.league.logo} alt={match.league.name} size={18} />
+          <TeamLogo src={leagueDisplayLogo(match)} alt={leagueDisplayName(match)} size={18} />
           <span className="text-xs font-medium text-athletix-text-muted">
-            {match.league.name}
+            {leagueDisplayName(match)}
             {match.league.round ? ` · ${match.league.round}` : ""}
           </span>
         </div>

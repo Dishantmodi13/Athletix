@@ -85,6 +85,15 @@ export interface MatchDetailsMeta {
   message?: string;
 }
 
+export interface PlayerOfTheMatch {
+  player: { id: number; name: string; photo: string };
+  team: { id: number; name: string; logo: string };
+  rating: number | null;
+  goals: number | null;
+  assists: number | null;
+  provisional?: boolean;
+}
+
 export interface MatchDetailsResult {
   match: NormalizedMatch | null;
   statistics: unknown[];
@@ -92,6 +101,7 @@ export interface MatchDetailsResult {
   lineups: unknown[];
   scoreSummary?: MatchScoreSummary[];
   meta?: MatchDetailsMeta;
+  playerOfTheMatch?: PlayerOfTheMatch | null;
 }
 
 export interface SearchResult {

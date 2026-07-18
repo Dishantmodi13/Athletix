@@ -1,17 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useUser } from "@/context/UserContext";
 import { isAuthenticated } from "@/lib/auth";
 
 export function GuestBanner() {
-  const [show, setShow] = useState(false);
+  const { user, loading } = useUser();
+  const signedIn = Boolean(user) || isAuthenticated();
 
-  useEffect(() => {
-    setShow(!isAuthenticated());
-  }, []);
-
-  if (!show) return null;
+  if (signedIn || loading) return null;
 
   return (
     <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-athletix-secondary/20 bg-athletix-secondary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">

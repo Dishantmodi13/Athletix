@@ -101,6 +101,16 @@ export interface MatchDetails {
     status: "full" | "limited" | "pending";
     message?: string;
   };
+  playerOfTheMatch?: PlayerOfTheMatch | null;
+}
+
+export interface PlayerOfTheMatch {
+  player: { id: number; name: string; photo: string };
+  team: { id: number; name: string; logo: string };
+  rating: number | null;
+  goals: number | null;
+  assists: number | null;
+  provisional?: boolean;
 }
 
 export interface PlayerDetails {
@@ -165,7 +175,16 @@ interface FootballResponse<T> {
   data?: T;
 }
 
-async function get<T>(path: string, init?: RequestInit): Promise<T> {
+const CLIENT_CACHE = new Map<string, { at: number; data: unknown }>();
+
+async function get<T>(path: string, init?: RequestInit, clientCacheMs = 0): Promise<T> {
+  if (clientCacheMs > 0) {
+    const hit = CLIENT_CACHE.get(path);
+    if (hit && Date.now() - hit.at < clientCacheMs) {
+      return hit.data as T;
+    }
+  }
+
   const res = await fetch(`${API_URL}/football${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
@@ -177,7 +196,24 @@ async function get<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(body.message ?? "Failed to load football data");
   }
 
-  return body.data as T;
+  const data = body.data as T;
+  if (clientCacheMs > 0) {
+    CLIENT_CACHE.set(path, { at: Date.now(), data });
+  }
+  return data;
+}
+
+export interface FootballHomeData {
+  worldCupFocus: boolean;
+  defaultLeague: number;
+  live: Match[];
+  today: Match[];
+  featuredUpcoming: Match[];
+  featuredRecent: Match[];
+  standings: StandingGroup[];
+  scorers: TopScorer[];
+  sidebarUpcoming: Match[];
+  sidebarScorers: TopScorer[];
 }
 
 /** Popular leagues used across the dashboard league tabs. */
@@ -201,6 +237,182 @@ export function getCompetitionMeta(id: number) {
 }
 
 export const FIFA_WORLD_CUP_ID = 1;
+export const FIFA_WORLD_CUP_NAME = "FIFA World Cup";
+export const WORLD_CUP_LEAGUE_LOGO = "https://crests.football-data.org/wm26.png";
+
+/** World Cup tournament ends 20 July 2026 — home feed switches to top leagues after this. */
+export const WORLD_CUP_END_DATE = "2026-07-20";
+
+export function isWorldCupFocusActive(now = new Date()): boolean {
+  const end = new Date(`${WORLD_CUP_END_DATE}T23:59:59`);
+  return now < end;
+}
+
+export function getDefaultHomeLeagueId(now = new Date()): number {
+  return isWorldCupFocusActive(now) ? FIFA_WORLD_CUP_ID : TOP_FIVE_LEAGUE_IDS[0];
+}
+
+export function teamRoute(id: number, name?: string): string {
+  if (!name?.trim()) return `/dashboard/team/${id}`;
+  return `/dashboard/team/${id}?name=${encodeURIComponent(name.trim())}`;
+}
+
+export function matchInvolvesTeam(match: Match, teamId: number): boolean {
+  return match.teams.home.id === teamId || match.teams.away.id === teamId;
+}
+
+export function normalizeTeamName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+export interface FollowedTeamRef {
+  id: number;
+  name: string;
+}
+
+export function matchIncludesFollowedTeam(match: Match, followed: FollowedTeamRef[]): boolean {
+  if (followed.length === 0) return false;
+
+  const ids = new Set(followed.map((team) => team.id));
+  const names = new Set(
+    followed.map((team) => normalizeTeamName(team.name)).filter(Boolean)
+  );
+  const homeName = normalizeTeamName(match.teams.home.name);
+  const awayName = normalizeTeamName(match.teams.away.name);
+
+  return (
+    ids.has(match.teams.home.id) ||
+    ids.has(match.teams.away.id) ||
+    names.has(homeName) ||
+    names.has(awayName)
+  );
+}
+
+export function filterFollowedMatches(matches: Match[], followed: FollowedTeamRef[]): Match[] {
+  if (followed.length === 0) return [];
+  return dedupeMatches(matches).filter((match) => matchIncludesFollowedTeam(match, followed));
+}
+
+function matchFixtureKey(match: Match): string {
+  const home = normalizeTeamName(match.teams.home.name);
+  const away = normalizeTeamName(match.teams.away.name);
+  const [a, b] = [home, away].sort();
+  const day = match.date.split("T")[0]!;
+  return `${a}|${b}|${day}`;
+}
+
+function preferMatch(a: Match, b: Match): Match {
+  let chosen: Match;
+  let other: Match;
+
+  const aLive = isLive(a.status.short);
+  const bLive = isLive(b.status.short);
+  if (aLive && !bLive) {
+    chosen = a;
+    other = b;
+  } else if (bLive && !aLive) {
+    chosen = b;
+    other = a;
+  } else if (a.league.id === FIFA_WORLD_CUP_ID && b.league.id === FIFA_WORLD_CUP_ID) {
+    const aFd = a.league.logo.includes("football-data.org");
+    const bFd = b.league.logo.includes("football-data.org");
+    if (aFd && !bFd) {
+      chosen = a;
+      other = b;
+    } else if (bFd && !aFd) {
+      chosen = b;
+      other = a;
+    } else {
+      chosen = a;
+      other = b;
+    }
+  } else if (a.detailFixtureId && a.detailFixtureId !== a.id) {
+    chosen = a;
+    other = b;
+  } else if (b.detailFixtureId && b.detailFixtureId !== b.id) {
+    chosen = b;
+    other = a;
+  } else {
+    chosen = a;
+    other = b;
+  }
+
+  return normalizeMatchBranding(chosen, other);
+}
+
+function normalizeMatchBranding(primary: Match, secondary?: Match): Match {
+  if (primary.league.id !== FIFA_WORLD_CUP_ID) return primary;
+
+  const fdLeague = [primary, secondary]
+    .filter(Boolean)
+    .map((match) => match!.league)
+    .find((league) => league.logo?.includes("football-data.org"));
+
+  const logo = fdLeague?.logo || primary.league.logo || secondary?.league.logo;
+  const safeLogo =
+    logo && !logo.includes("api-sports.io") ? logo : WORLD_CUP_LEAGUE_LOGO;
+
+  return {
+    ...primary,
+    league: {
+      ...primary.league,
+      name: FIFA_WORLD_CUP_NAME,
+      logo: safeLogo,
+    },
+    detailFixtureId:
+      primary.detailFixtureId ??
+      (secondary && secondary.id !== primary.id ? secondary.id : undefined),
+  };
+}
+
+export function leagueDisplayLogo(match: Pick<Match, "league">): string {
+  if (match.league.id === FIFA_WORLD_CUP_ID) {
+    const logo = match.league.logo?.trim();
+    if (!logo || logo.includes("api-sports.io")) return WORLD_CUP_LEAGUE_LOGO;
+  }
+  return match.league.logo;
+}
+
+export function leagueDisplayName(match: Pick<Match, "league">): string {
+  if (match.league.id === FIFA_WORLD_CUP_ID) return FIFA_WORLD_CUP_NAME;
+  return match.league.name;
+}
+
+/** Collapse duplicate fixtures from different provider ids. */
+export function dedupeMatches(matches: Match[]): Match[] {
+  const byKey = new Map<string, Match>();
+  for (const match of matches) {
+    const key = matchFixtureKey(match);
+    const existing = byKey.get(key);
+    const merged = existing ? preferMatch(existing, match) : normalizeMatchBranding(match);
+    byKey.set(key, merged);
+  }
+  return [...byKey.values()];
+}
+
+export function sortMatchesFollowedFirst(matches: Match[], followed: FollowedTeamRef[]): Match[] {
+  if (followed.length === 0) return matches;
+  return [...matches].sort((a, b) => {
+    const aFollowed = matchIncludesFollowedTeam(a, followed);
+    const bFollowed = matchIncludesFollowedTeam(b, followed);
+    if (aFollowed === bFollowed) return a.timestamp - b.timestamp;
+    return aFollowed ? -1 : 1;
+  });
+}
+
+function encodeFollowedTeams(teams: FollowedTeamRef[]): string {
+  return teams.map((team) => `${team.id}:${encodeURIComponent(team.name)}`).join(",");
+}
+
+export function isTopLeagueMatch(match: Match): boolean {
+  return TOP_FIVE_LEAGUE_IDS.includes(match.league.id as (typeof TOP_FIVE_LEAGUE_IDS)[number]);
+}
 
 /** Top 5 European leagues shown on the home dashboard. */
 export const TOP_FIVE_LEAGUE_IDS = [39, 140, 135, 78, 61] as const;
@@ -237,9 +449,16 @@ export function isUpcoming(status: string): boolean {
 }
 
 export const football = {
-  live: () => get<Match[]>("/live"),
+  home: () => get<FootballHomeData>("/home", undefined, 30_000),
+  followedMatches: (teams: FollowedTeamRef[]) =>
+    get<Match[]>(
+      `/followed-matches?teams=${encodeFollowedTeams(teams)}`,
+      undefined,
+      30_000
+    ),
+  live: () => get<Match[]>("/live", undefined, 20_000),
   fixtures: (date?: string) =>
-    get<Match[]>(`/fixtures${date ? `?date=${date}` : ""}`),
+    get<Match[]>(`/fixtures${date ? `?date=${date}` : ""}`, undefined, 60_000),
   leagueFixtures: (league: number, next = 10) =>
     get<Match[]>(`/fixtures/league?league=${league}&next=${next}`),
   leagueUpcoming: (league: number, limit = 10) =>
@@ -252,8 +471,12 @@ export const football = {
   topAssists: (league: number) => get<TopScorer[]>(`/top-assists?league=${league}`),
   leagues: () => get<unknown[]>("/leagues"),
   matchDetails: (id: number) => get<MatchDetails>(`/match/${id}`),
-  team: (id: number) =>
-    get<{ team: unknown; fixtures: Match[] }>(`/team/${id}`),
+  team: (id: number, name?: string) =>
+    get<{ team: unknown; fixtures: Match[] }>(
+      `/team/${id}${name ? `?name=${encodeURIComponent(name)}` : ""}`,
+      undefined,
+      120_000
+    ),
   player: (id: number, name?: string) =>
     get<PlayerDetails>(
       `/player/${id}${name ? `?name=${encodeURIComponent(name)}` : ""}`

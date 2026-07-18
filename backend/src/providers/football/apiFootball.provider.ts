@@ -39,6 +39,10 @@ interface RawFixture {
 import { FINISHED_STATUSES as FINISHED, pickLeagueFixtures, type FixtureRange } from "./fixturesUtils";
 import { eventsFromApiFootball } from "./matchEventsUtils";
 import { normalizeLineups } from "./lineupUtils";
+import {
+  normalizeApiFootballTopAssists,
+  normalizeApiFootballTopScorers,
+} from "./topPlayerNormalize";
 import { normalizeApiFootballPlayer } from "./playerProfileUtils";
 import type { NormalizedPlayerProfile } from "./playerProfile.types";
 
@@ -342,22 +346,33 @@ export class ApiFootballProvider implements FootballProvider {
 
   async getTopScorers(league: number, season: number): Promise<TopScorer[]> {
     if (league === WORLD_CUP_LEAGUE_ID) return [];
-    return this.requestWithSeasonFallback<TopScorer[]>(
+    const raw = await this.requestWithSeasonFallback<unknown[]>(
       "players/topscorers",
       league,
       season,
       600
     );
+    return normalizeApiFootballTopScorers(raw ?? [], league);
   }
 
   async getTopAssists(league: number, season: number): Promise<TopScorer[]> {
-    if (league === WORLD_CUP_LEAGUE_ID) return [];
-    return this.requestWithSeasonFallback<TopScorer[]>(
-      "players/topassists",
-      league,
-      season,
-      600
-    );
+    const seasons = league === WORLD_CUP_LEAGUE_ID ? [season] : [season];
+
+    for (const year of seasons) {
+      try {
+        const batch = await this.request<unknown[]>(
+          "players/topassists",
+          { league, season: year },
+          600
+        );
+        const normalized = normalizeApiFootballTopAssists(batch ?? [], league);
+        if (normalized.length > 0) return normalized;
+      } catch (error) {
+        if (isSeasonAccessError(error)) continue;
+      }
+    }
+
+    return [];
   }
 
   /** Fetch scorer/assist lists from API-Football for player photo lookup. */
@@ -400,6 +415,21 @@ export class ApiFootballProvider implements FootballProvider {
     }
 
     return merged;
+  }
+
+  async getFixturePlayerStats(id: number): Promise<unknown[]> {
+    const cacheKey = `af:fixture-players:v1:${id}`;
+    const cached = cache.get<unknown[]>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const data = await this.request<unknown[]>("fixtures/players", { fixture: id }, 300);
+      cache.set(cacheKey, data, 300);
+      return data;
+    } catch {
+      const stale = cache.getStale<unknown[]>(cacheKey);
+      return stale ?? [];
+    }
   }
 
   async getMatchDetails(id: number): Promise<MatchDetailsResult> {

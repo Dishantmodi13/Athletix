@@ -107,6 +107,62 @@ export function getSubstitutionInfo(
   return null;
 }
 
+function positionRole(pos: string): number {
+  const p = pos.trim().toUpperCase();
+  if (p === "G" || p.startsWith("G")) return 1;
+  if (p === "D" || p.startsWith("D")) return 2;
+  if (p === "M" || p.startsWith("M")) return 3;
+  if (p === "F" || p.startsWith("F")) return 4;
+  return 3;
+}
+
+/**
+ * API-Football grid columns are from each team's perspective facing the opponent.
+ * Mirror columns for the away side (drawn inverted at the top) so both teams share
+ * the same left/right touchline on screen.
+ */
+function columnToScreenX(col: number, maxCol: number, side: "home" | "away"): number {
+  const displayCol = side === "away" ? maxCol - col + 1 : col;
+  return 14 + ((displayCol - 0.5) / maxCol) * 70;
+}
+
+function computePositionsFromRoles(
+  players: LineupPlayer[],
+  side: "home" | "away"
+): Map<number, { x: number; y: number }> {
+  const positions = new Map<number, { x: number; y: number }>();
+  const byRow = new Map<number, LineupPlayer[]>();
+
+  for (const player of players) {
+    const row = positionRole(player.pos);
+    if (!byRow.has(row)) byRow.set(row, []);
+    byRow.get(row)!.push(player);
+  }
+
+  const rows = [...byRow.keys()].sort((a, b) => a - b);
+  const maxRow = Math.max(...rows, 1);
+
+  for (const row of rows) {
+    const rowPlayers = [...byRow.get(row)!].sort((a, b) => {
+      if (a.number !== b.number) return a.number - b.number;
+      return a.name.localeCompare(b.name);
+    });
+    const maxCol = rowPlayers.length;
+
+    rowPlayers.forEach((player, index) => {
+      const x = columnToScreenX(index + 1, maxCol, side);
+      const rowProgress = (row - 1) / Math.max(maxRow - 1, 1);
+      const y =
+        side === "home"
+          ? 90 - rowProgress * 34
+          : 10 + rowProgress * 34;
+      positions.set(player.id, { x, y });
+    });
+  }
+
+  return positions;
+}
+
 function computePositions(
   players: LineupPlayer[],
   side: "home" | "away"
@@ -115,6 +171,10 @@ function computePositions(
   const withGrid = players
     .map((p) => ({ player: p, grid: parseGrid(p.grid) }))
     .filter((entry): entry is { player: LineupPlayer; grid: GridPos } => entry.grid !== null);
+
+  if (withGrid.length < Math.max(players.length / 2, 1)) {
+    return computePositionsFromRoles(players, side);
+  }
 
   const byRow = new Map<number, Array<{ player: LineupPlayer; grid: GridPos }>>();
   for (const entry of withGrid) {
@@ -125,14 +185,13 @@ function computePositions(
 
   const maxRow = Math.max(...withGrid.map((e) => e.grid.row), 1);
 
-  for (const [row, rowPlayers] of byRow) {
+  for (const [, rowPlayers] of byRow) {
     const maxCol = Math.max(...rowPlayers.map((e) => e.grid.col), 1);
     rowPlayers.sort((a, b) => a.grid.col - b.grid.col);
 
     rowPlayers.forEach((entry) => {
-      const x = 14 + ((entry.grid.col - 0.5) / maxCol) * 70;
-      const rowProgress = (row - 1) / Math.max(maxRow - 1, 1);
-      // Push away team up and home team down to open space in the middle
+      const x = columnToScreenX(entry.grid.col, maxCol, side);
+      const rowProgress = (entry.grid.row - 1) / Math.max(maxRow - 1, 1);
       const y =
         side === "home"
           ? 90 - rowProgress * 34
@@ -144,23 +203,37 @@ function computePositions(
   return positions;
 }
 
+export function lineupsHaveStarters(home?: TeamLineup, away?: TeamLineup): boolean {
+  return (home?.startXI.length ?? 0) > 0 && (away?.startXI.length ?? 0) > 0;
+}
+
 export function resolveMatchLineups(
   lineups: TeamLineup[],
   home: { id: number; name: string },
   away: { id: number; name: string }
 ): { home?: TeamLineup; away?: TeamLineup } {
-  if (lineups.length < 2) {
-    return { home: lineups[0], away: lineups[1] };
+  if (lineups.length === 0) {
+    return {};
+  }
+
+  if (lineups.length === 1) {
+    const only = lineups[0]!;
+    if (namesMatch(only.team.name, home.name)) return { home: only };
+    if (namesMatch(only.team.name, away.name)) return { away: only };
+    return { home: only };
   }
 
   const homeLineup =
     lineups.find((l) => l.team.id === home.id) ??
     lineups.find((l) => namesMatch(l.team.name, home.name));
-  const awayLineup =
-    lineups.find((l) => l.team.id === away.id) ??
-    lineups.find((l) => namesMatch(l.team.name, away.name));
 
-  if (homeLineup && awayLineup && homeLineup.team.id !== awayLineup.team.id) {
+  const awayLineup =
+    lineups.find((l) => l !== homeLineup && l.team.id === away.id) ??
+    lineups.find(
+      (l) => l !== homeLineup && namesMatch(l.team.name, away.name)
+    );
+
+  if (homeLineup && awayLineup) {
     return { home: homeLineup, away: awayLineup };
   }
 

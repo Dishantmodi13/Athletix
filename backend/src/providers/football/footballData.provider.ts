@@ -1,6 +1,7 @@
 import { env } from "../../config/env";
 import { AppError } from "../../middleware/errorHandler";
 import { cache } from "../../services/cache.service";
+import { persistentMatchCache } from "../../services/persistentMatchCache";
 import { ApiKeyPool, isRateLimitError, parseKeyList } from "./apiKeyPool";
 import { toApiFootballLeague, toFootballDataCompetition, WORLD_CUP_LEAGUE_ID } from "./leagueMap";
 import { footballDataThrottle } from "./requestThrottle";
@@ -27,6 +28,12 @@ import {
   sortTopAssists,
   sortTopScorers,
 } from "./worldCupStats";
+import {
+  aggregateFromMatchEvents,
+  aggregateGoalsFromMatch,
+  assistAccumulatorToTopScorers,
+  type AssistAccumulator,
+} from "./assistLeaderboard";
 
 const BASE_URL = "https://api.football-data.org/v4";
 
@@ -476,6 +483,117 @@ export class FootballDataProvider implements FootballProvider {
         ? await this.fetchTournamentScorers(league, season, 500)
         : await this.fetchCompetitionScorers(league, season, 500);
     return sortTopAssists(scorers.map((s) => this.mapScorerRow(s)));
+  }
+
+  /** Accurate assists counted from each goal's assist field across finished matches. */
+  async getTopAssistsFromMatchGoals(league: number, season: number): Promise<TopScorer[]> {
+    if (!this.competitionPath(league)) return [];
+
+    const cacheKey = `assists-from-events:v3:${league}:${season}`;
+    const cached = cache.get<TopScorer[]>(cacheKey);
+    if (cached?.length) return cached;
+
+    try {
+      const matches = await this.fetchCompetitionMatchFeed(league, season);
+      const nationalTeamIds =
+        league === WORLD_CUP_LEAGUE_ID
+          ? await this.fetchWorldCupNationalTeamIds(season)
+          : new Set<number>();
+      const accum = new Map<string, AssistAccumulator>();
+
+      const finished = matches.filter((m) => m.status === "FINISHED");
+
+      for (const raw of finished) {
+        const match = normalizeFdMatch(raw);
+        if (nationalTeamIds.size > 0) {
+          const homeNational = nationalTeamIds.has(match.teams.home.id);
+          const awayNational = nationalTeamIds.has(match.teams.away.id);
+          if (!homeNational && !awayNational) continue;
+        }
+
+        const home = {
+          id: match.teams.home.id,
+          name: match.teams.home.name,
+          logo: match.teams.home.logo,
+        };
+        const away = {
+          id: match.teams.away.id,
+          name: match.teams.away.name,
+          logo: match.teams.away.logo,
+        };
+
+        if (raw.goals?.length) {
+          aggregateGoalsFromMatch(raw.goals, home, away, accum);
+          continue;
+        }
+
+        const cachedMatch = await persistentMatchCache.get(raw.id);
+        if (cachedMatch?.match && cachedMatch.events.length > 0) {
+          aggregateFromMatchEvents(cachedMatch.events, home, away, accum);
+          continue;
+        }
+
+        try {
+          const details = await this.getMatchDetails(raw.id);
+          if (!details.match) continue;
+          aggregateFromMatchEvents(details.events, home, away, accum);
+          if (details.events.length > 0) {
+            await persistentMatchCache.set(raw.id, details);
+          }
+        } catch {
+          // Skip when football-data rate limits are hit.
+        }
+      }
+
+      const rows = assistAccumulatorToTopScorers(accum.values());
+      if (rows.length > 0) {
+        cache.set(cacheKey, rows, 6 * 3600);
+      }
+      return rows;
+    } catch {
+      return [];
+    }
+  }
+
+  private async fetchCompetitionMatchFeed(league: number, season: number): Promise<FdMatch[]> {
+    const base = this.competitionPath(league);
+    if (!base) return [];
+
+    const path = `${base}/matches?season=${season}`;
+    const cacheKey = `fd:unfold-goals:${path}`;
+
+    return cache.wrap<FdMatch[]>(cacheKey, 600, () =>
+      footballDataThrottle.schedule(() =>
+        this.keyPool.execute(async (apiKey) => {
+          let res: Response;
+          try {
+            res = await fetch(`${BASE_URL}${path}`, {
+              headers: {
+                "X-Auth-Token": apiKey,
+                "X-Unfold-Goals": "true",
+              },
+            });
+          } catch {
+            throw new AppError("Unable to reach football-data.org", 502);
+          }
+
+          if (res.status === 429) {
+            throw new AppError("football-data.org rate limit reached", 429);
+          }
+
+          if (res.status === 403) {
+            throw new AppError("football-data.org access forbidden or quota exceeded", 403);
+          }
+
+          if (!res.ok) {
+            throw new AppError(`football-data.org HTTP ${res.status}`, res.status);
+          }
+
+          const data = (await res.json()) as { matches?: FdMatch[] };
+          return data.matches ?? [];
+        }, isRateLimitError)
+      )
+    );
   }
 
   async getMatchDetails(id: number): Promise<MatchDetailsResult> {

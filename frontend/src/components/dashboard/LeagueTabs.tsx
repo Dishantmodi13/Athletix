@@ -1,16 +1,21 @@
 "use client";
 
-import { HOME_COMPETITIONS } from "@/lib/football";
+import { HOME_COMPETITIONS, FIFA_WORLD_CUP_ID } from "@/lib/football";
 
 interface LeagueTabsProps {
   active: number;
   onChange: (id: number) => void;
+  worldCupFocus?: boolean;
 }
 
-export function LeagueTabs({ active, onChange }: LeagueTabsProps) {
+export function LeagueTabs({ active, onChange, worldCupFocus = true }: LeagueTabsProps) {
+  const tabs = worldCupFocus
+    ? HOME_COMPETITIONS
+    : HOME_COMPETITIONS.filter((league) => league.id !== FIFA_WORLD_CUP_ID);
+
   return (
     <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {HOME_COMPETITIONS.map((league) => (
+      {tabs.map((league) => (
         <button
           key={league.id}
           type="button"

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { disableGuestMode } from "@/lib/auth";
+import { markSessionStarted } from "@/lib/session";
 import { saveAuthToken, sendOtp, verifyOtp } from "@/lib/api";
 import { saveUserProfile } from "@/lib/user";
 import { validateEmail } from "../EmailInput";
@@ -79,6 +80,7 @@ export function useAuthFlow(options: UseAuthFlowOptions = {}) {
       disableGuestMode();
       saveAuthToken(data.token);
       saveUserProfile(data.user);
+      markSessionStarted();
 
       if (onVerified) {
         await onVerified();

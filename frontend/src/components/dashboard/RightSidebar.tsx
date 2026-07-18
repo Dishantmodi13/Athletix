@@ -3,9 +3,15 @@
 import { Flame, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FIFA_WORLD_CUP_ID, football, matchDetailRouteId, playerRoute } from "@/lib/football";
+import {
+  FIFA_WORLD_CUP_ID,
+  TOP_FIVE_LEAGUE_IDS,
+  matchDetailRouteId,
+  playerRoute,
+  type Match,
+  type TopScorer,
+} from "@/lib/football";
 import { formatKickoff, formatMatchDate } from "@/lib/format";
-import { useFetch } from "@/hooks/useFetch";
 import { Skeleton } from "./ui/Skeleton";
 import { PlayerAvatar } from "./ui/PlayerAvatar";
 import { TeamLogo } from "./ui/TeamLogo";
@@ -30,22 +36,35 @@ function WidgetShell({
   );
 }
 
-export function RightSidebar() {
+interface RightSidebarProps {
+  worldCupFocus?: boolean;
+  upcoming?: Match[];
+  scorers?: TopScorer[];
+  loading?: boolean;
+}
+
+export function RightSidebar({
+  worldCupFocus = true,
+  upcoming,
+  scorers,
+  loading = false,
+}: RightSidebarProps) {
   const router = useRouter();
-  const scorers = useFetch(() => football.topScorers(FIFA_WORLD_CUP_ID), []);
-  const upcoming = useFetch(() => football.leagueUpcoming(FIFA_WORLD_CUP_ID, 4), []);
 
   return (
     <aside className="sticky top-16 hidden h-fit w-80 shrink-0 flex-col gap-4 py-6 pr-6 xl:flex">
-      <WidgetShell title="Upcoming World Cup" icon={<TrendingUp className="h-4 w-4" />}>
+      <WidgetShell
+        title={worldCupFocus ? "Upcoming World Cup" : "Upcoming Top Leagues"}
+        icon={<TrendingUp className="h-4 w-4" />}
+      >
         <div className="space-y-3">
-          {upcoming.loading ? (
+          {loading ? (
             <>
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-8 w-full" />
             </>
           ) : (
-            upcoming.data?.slice(0, 4).map((m) => (
+            upcoming?.slice(0, 4).map((m) => (
               <button
                 key={m.id}
                 type="button"
@@ -73,16 +92,19 @@ export function RightSidebar() {
         </div>
       </WidgetShell>
 
-      <WidgetShell title="World Cup Scorers" icon={<Flame className="h-4 w-4" />}>
+      <WidgetShell
+        title={worldCupFocus ? "World Cup Scorers" : "Premier League Scorers"}
+        icon={<Flame className="h-4 w-4" />}
+      >
         <div className="space-y-2.5">
-          {scorers.loading ? (
+          {loading ? (
             <>
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-8 w-full" />
             </>
           ) : (
-            scorers.data?.slice(0, 5).map((s, i) => (
+            scorers?.slice(0, 5).map((s, i) => (
               <button
                 key={s.player.id}
                 type="button"
@@ -100,10 +122,14 @@ export function RightSidebar() {
           )}
         </div>
         <Link
-          href={`/dashboard/competitions/${FIFA_WORLD_CUP_ID}`}
+          href={
+            worldCupFocus
+              ? `/dashboard/competitions/${FIFA_WORLD_CUP_ID}`
+              : `/dashboard/competitions/${TOP_FIVE_LEAGUE_IDS[0]}`
+          }
           className="mt-3 block text-center text-xs font-medium text-athletix-primary hover:text-blue-400"
         >
-          View FIFA World Cup
+          {worldCupFocus ? "View FIFA World Cup" : "View Premier League"}
         </Link>
       </WidgetShell>
     </aside>

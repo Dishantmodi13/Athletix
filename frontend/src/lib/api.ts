@@ -1,4 +1,4 @@
-import { disableGuestMode } from "./auth";
+import { disableGuestMode, AUTH_CHANGE_EVENT } from "./auth";
 import type { UserProfile } from "@/types/user";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api";
@@ -52,6 +52,7 @@ export function saveAuthToken(token: string) {
   if (typeof window !== "undefined") {
     disableGuestMode();
     localStorage.setItem("athletix-token", token);
+    window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
   }
 }
 

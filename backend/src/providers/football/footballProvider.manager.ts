@@ -8,9 +8,11 @@ import type { FootballProvider } from "./football.types";
 
 type ProviderMethod = Exclude<keyof FootballProvider, "name" | "isAvailable">;
 
+/** Dedicated assists leaderboard is resolved in loadTopAssists (football-data goal events). */
+const API_FOOTBALL_FIRST_METHODS: ProviderMethod[] = [];
+
 const FOOTBALL_DATA_FIRST_METHODS: ProviderMethod[] = [
   "getTopScorers",
-  "getTopAssists",
   "getStandings",
   "getFixturesByLeague",
 ];
@@ -40,6 +42,11 @@ function orderProviders(
     FOOTBALL_DATA_FIRST_METHODS.includes(method)
   ) {
     return providers.filter((p) => p.name === "football-data");
+  }
+
+  if (API_FOOTBALL_FIRST_METHODS.includes(method)) {
+    const apiOnly = providers.filter((p) => p.name === "api-football");
+    if (apiOnly.length > 0) return apiOnly;
   }
 
   if (

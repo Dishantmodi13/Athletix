@@ -1,7 +1,9 @@
 import type { MatchDetailsResult } from "./football.types";
 import type { NormalizedMatchEvent } from "./matchEventsUtils";
+import { MIN_LINEUP_STARTERS } from "./matchMergeUtils";
 
 const FINISHED = new Set(["FT", "AET", "PEN"]);
+const LIVE_PHASES = new Set(["1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT"]);
 
 function totalGoals(result: MatchDetailsResult): number {
   if (!result.match) return 0;
@@ -62,6 +64,12 @@ export function isCompleteMatchDetails(result: MatchDetailsResult): boolean {
 
   const finished = FINISHED.has(result.match.status.short);
   if (!finished) {
+    const liveStarted =
+      LIVE_PHASES.has(result.match.status.short) ||
+      (result.match.status.elapsed ?? 0) > 0;
+    if (liveStarted && lineupPlayerCount(result) < MIN_LINEUP_STARTERS) {
+      return false;
+    }
     return hasAnyMatchDetails(result);
   }
 

@@ -1,9 +1,11 @@
 import { cache } from "../../services/cache.service";
 import { footballDataProvider } from "./footballData.provider";
+import { loadTopAssists } from "./topAssistsResolver";
 import { WORLD_CUP_LEAGUE_ID } from "./leagueMap";
 import type { NormalizedPlayerProfile } from "./playerProfile.types";
 import { theSportsDbPlayerProvider } from "./theSportsDbPlayer.provider";
 import type { TopScorer } from "./football.types";
+import { footballProviderManager } from "./footballProvider.manager";
 import { resolveFootballSeason } from "../../utils/footballSeason";
 
 function namesCompatible(a: string, b: string): boolean {
@@ -39,21 +41,27 @@ async function getScorerCatalog(
   leagueId: number,
   season: number
 ): Promise<{ scorers: TopScorer[]; assists: TopScorer[] }> {
-  const cacheKey = `player-scorer-catalog:v1:${leagueId}:${season}`;
+  const cacheKey = `player-scorer-catalog:v3:${leagueId}:${season}`;
   const cached = cache.get<{ scorers: TopScorer[]; assists: TopScorer[] }>(cacheKey);
   if (cached) return cached;
 
-  if (!footballDataProvider.isAvailable()) {
-    return { scorers: [], assists: [] };
-  }
-
   try {
-    const [scorers, assists] = await Promise.all([
-      footballDataProvider.getTopScorers(leagueId, season),
-      footballDataProvider.getTopAssists(leagueId, season),
-    ]);
+    const scorers = await footballProviderManager.execute(
+      "getTopScorers",
+      leagueId,
+      season
+    );
+
+    let assists: TopScorer[] = [];
+    const loaded = await loadTopAssists(leagueId, season);
+    if (loaded.length > 0) {
+      assists = loaded;
+    }
+
     const payload = { scorers, assists };
-    cache.set(cacheKey, payload, 3600);
+    if (scorers.length > 0 || assists.length > 0) {
+      cache.set(cacheKey, payload, 3600);
+    }
     return payload;
   } catch {
     return { scorers: [], assists: [] };

@@ -2,19 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BOTTOM_NAV_ITEMS } from "./nav-items";
+import { isCricketRoute } from "@/lib/sports";
+import { isNavItemActive } from "./Sidebar";
+import { BOTTOM_NAV_ITEMS, CRICKET_BOTTOM_NAV_ITEMS } from "./nav-items";
 
 export function BottomNav() {
   const pathname = usePathname();
+  const items = isCricketRoute(pathname) ? CRICKET_BOTTOM_NAV_ITEMS : BOTTOM_NAV_ITEMS;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.08] bg-athletix-bg-deep/90 backdrop-blur-xl lg:hidden">
       <div className="flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
-        {BOTTOM_NAV_ITEMS.map((item) => {
-          const active =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname.startsWith(item.href);
+        {items.map((item) => {
+          const active = isNavItemActive(pathname, item.href);
           const Icon = item.icon;
 
           return (

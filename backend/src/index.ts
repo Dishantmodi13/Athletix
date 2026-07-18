@@ -2,6 +2,8 @@ import app from "./app";
 import { connectDB } from "./config/db";
 import { env } from "./config/env";
 import { warmFeaturedLeagueCaches } from "./services/leagueDataCache";
+import { footballService } from "./services/football.service";
+import { warmCricketLeagueDiscovery } from "./providers/cricket/espnCricket.provider";
 import { isEmailConfigured, getEmailSetupHint } from "./services/otp.service";
 
 async function startServer(): Promise<void> {
@@ -22,6 +24,8 @@ async function startServer(): Promise<void> {
     console.log(`Athletix API running on http://localhost:${env.port}`);
     setTimeout(() => {
       void warmFeaturedLeagueCaches();
+      void footballService.getHomeDashboard().catch(() => undefined);
+      warmCricketLeagueDiscovery();
     }, 15_000);
   });
 }

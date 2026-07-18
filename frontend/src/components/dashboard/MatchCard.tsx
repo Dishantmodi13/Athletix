@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { isFinished, isLive, matchDetailRouteId, type Match } from "@/lib/football";
+import { isFinished, isLive, leagueDisplayLogo, leagueDisplayName, matchDetailRouteId, type Match } from "@/lib/football";
 import { formatKickoff, formatMatchDate } from "@/lib/format";
 import { LiveBadge } from "./LiveBadge";
 import { TeamLogo } from "./ui/TeamLogo";
@@ -61,9 +61,9 @@ export function MatchCard({ match, index = 0 }: MatchCardProps) {
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
-          <TeamLogo src={match.league.logo} alt={match.league.name} size={16} />
+          <TeamLogo src={leagueDisplayLogo(match)} alt={leagueDisplayName(match)} size={16} />
           <span className="truncate text-xs text-athletix-text-muted">
-            {match.league.name}
+            {leagueDisplayName(match)}
           </span>
         </div>
         {live ? (

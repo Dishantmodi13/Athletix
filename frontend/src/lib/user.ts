@@ -1,5 +1,6 @@
 import { API_URL } from "./api";
 import { AUTH_TOKEN_KEY, USER_STORAGE_KEY } from "./auth";
+import type { FollowedTeam } from "@/types/followedTeam";
 import type { UpdateProfilePayload, UserProfile } from "@/types/user";
 
 interface ApiResponse<T> {
@@ -44,6 +45,19 @@ export async function updateUserProfile(payload: UpdateProfilePayload): Promise<
   });
 }
 
+export async function followTeamOnServer(team: FollowedTeam): Promise<UserProfile> {
+  return authRequest<UserProfile>("/users/me/followed-teams", {
+    method: "POST",
+    body: JSON.stringify(team),
+  });
+}
+
+export async function unfollowTeamOnServer(teamId: number): Promise<UserProfile> {
+  return authRequest<UserProfile>(`/users/me/followed-teams/${teamId}`, {
+    method: "DELETE",
+  });
+}
+
 export function getAvatarUrl(avatar: string | null | undefined): string | null {
   if (!avatar) return null;
   if (avatar.startsWith("http") || avatar.startsWith("data:")) return avatar;
@@ -69,7 +83,11 @@ export function loadUserProfile(): UserProfile | null {
   const raw = localStorage.getItem(USER_STORAGE_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as UserProfile;
+    const parsed = JSON.parse(raw) as UserProfile;
+    return {
+      ...parsed,
+      followedTeams: parsed.followedTeams ?? [],
+    };
   } catch {
     return null;
   }

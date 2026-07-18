@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { enableGuestMode } from "@/lib/auth";
+import { markSessionStarted } from "@/lib/session";
 import { SecondaryButton } from "./SecondaryButton";
 
 export function GuestButton() {
@@ -9,6 +10,7 @@ export function GuestButton() {
 
   const handleGuest = () => {
     enableGuestMode();
+    markSessionStarted();
     router.push("/dashboard");
   };
 

@@ -1,7 +1,9 @@
 import { NextFunction, Request, Response, Router } from "express";
 import {
   getFixtures,
+  getFollowedMatches,
   getHeadToHead,
+  getHome,
   getKnockout,
   getLeagueFixtures,
   getLeagues,
@@ -25,6 +27,8 @@ const wrap =
     handler(req, res).catch(next);
   };
 
+router.get("/home", wrap(getHome));
+router.get("/followed-matches", wrap(getFollowedMatches));
 router.get("/live", wrap(getLive));
 router.get("/fixtures", wrap(getFixtures));
 router.get("/fixtures/league", wrap(getLeagueFixtures));

@@ -1,4 +1,4 @@
-import type { IUser } from "../models/User.model";
+import type { IUser, FollowedTeam } from "../models/User.model";
 
 export interface SerializedUser {
   id: string;
@@ -9,6 +9,7 @@ export interface SerializedUser {
   state: string | null;
   country: string | null;
   avatar: string | null;
+  followedTeams: FollowedTeam[];
 }
 
 export function serializeUser(user: IUser & { _id: { toString(): string } }): SerializedUser {
@@ -23,5 +24,6 @@ export function serializeUser(user: IUser & { _id: { toString(): string } }): Se
     state: user.state ?? null,
     country: user.country ?? null,
     avatar: user.avatar ?? null,
+    followedTeams: user.followedTeams ?? [],
   };
 }

@@ -1,6 +1,12 @@
 export const GUEST_STORAGE_KEY = "athletix-guest";
 export const AUTH_TOKEN_KEY = "athletix-token";
 export const USER_STORAGE_KEY = "athletix-user";
+export const AUTH_CHANGE_EVENT = "athletix-auth-change";
+
+function notifyAuthChange() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
+}
 
 export function enableGuestMode() {
   if (typeof window === "undefined") return;
@@ -19,6 +25,7 @@ export function clearAuthSession() {
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(USER_STORAGE_KEY);
   localStorage.removeItem(GUEST_STORAGE_KEY);
+  notifyAuthChange();
 }
 
 export function isGuestMode(): boolean {

@@ -5,8 +5,9 @@ import { ArrowLeft, MapPin } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { LiveBadge } from "@/components/dashboard/LiveBadge";
+import { PlayerOfTheMatchCard } from "@/components/dashboard/PlayerOfTheMatchCard";
 import { MatchLineupList } from "@/components/dashboard/match/MatchLineupList";
-import { MatchPitchLineup, resolveMatchLineups, type TeamLineup } from "@/components/dashboard/match/MatchPitchLineup";
+import { MatchPitchLineup, lineupsHaveStarters, resolveMatchLineups, type TeamLineup } from "@/components/dashboard/match/MatchPitchLineup";
 import { TeamLogo } from "@/components/dashboard/ui/TeamLogo";
 import { Skeleton } from "@/components/dashboard/ui/Skeleton";
 import { useFetch } from "@/hooks/useFetch";
@@ -14,6 +15,9 @@ import {
   football,
   isFinished,
   isLive,
+  leagueDisplayLogo,
+  leagueDisplayName,
+  teamRoute,
   type MatchEvent,
   type MatchScoreSummary,
 } from "@/lib/football";
@@ -333,6 +337,9 @@ export default function MatchDetailsPage() {
     match.teams.home,
     match.teams.away
   );
+  const showPitchLineups = Boolean(
+    homeLineup && awayLineup && lineupsHaveStarters(homeLineup, awayLineup)
+  );
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "goals", label: "Goalscorers", count: goals.length },
@@ -342,7 +349,7 @@ export default function MatchDetailsPage() {
   ];
 
   return (
-    <div className={`mx-auto ${tab === "lineups" && homeLineup && awayLineup ? "max-w-2xl" : "max-w-3xl"}`}>
+    <div className={`mx-auto ${tab === "lineups" && showPitchLineups ? "max-w-2xl" : "max-w-3xl"}`}>
       <button
         type="button"
         onClick={() => router.back()}
@@ -366,15 +373,15 @@ export default function MatchDetailsPage() {
         />
         <div className="relative">
           <div className="mb-5 flex items-center justify-center gap-2">
-            <TeamLogo src={match.league.logo} alt={match.league.name} size={18} />
+            <TeamLogo src={leagueDisplayLogo(match)} alt={leagueDisplayName(match)} size={18} />
             <span className="text-xs text-athletix-text-muted">
-              {match.league.name} · {match.league.round}
+              {leagueDisplayName(match)} · {match.league.round}
             </span>
           </div>
           <div className="flex items-center justify-between gap-4">
             <button
               type="button"
-              onClick={() => router.push(`/dashboard/team/${match.teams.home.id}`)}
+              onClick={() => router.push(teamRoute(match.teams.home.id, match.teams.home.name))}
               className="flex flex-1 flex-col items-center gap-2"
             >
               <TeamLogo src={match.teams.home.logo} alt={match.teams.home.name} size={56} />
@@ -407,7 +414,7 @@ export default function MatchDetailsPage() {
             </div>
             <button
               type="button"
-              onClick={() => router.push(`/dashboard/team/${match.teams.away.id}`)}
+              onClick={() => router.push(teamRoute(match.teams.away.id, match.teams.away.name))}
               className="flex flex-1 flex-col items-center gap-2"
             >
               <TeamLogo src={match.teams.away.logo} alt={match.teams.away.name} size={56} />
@@ -433,6 +440,12 @@ export default function MatchDetailsPage() {
           )}
         </div>
       </motion.div>
+
+      {data?.playerOfTheMatch && (
+        <div className="mb-6">
+          <PlayerOfTheMatchCard potm={data.playerOfTheMatch} sport="football" />
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="mb-6 flex gap-2 overflow-x-auto pb-1">
@@ -531,8 +544,8 @@ export default function MatchDetailsPage() {
 
       {/* Lineups */}
       {tab === "lineups" &&
-        (homeLineup && awayLineup ? (
-          <MatchPitchLineup home={homeLineup} away={awayLineup} events={events} />
+        (showPitchLineups ? (
+          <MatchPitchLineup home={homeLineup!} away={awayLineup!} events={events} />
         ) : lineups.length > 0 ? (
           <MatchLineupList lineups={lineups} events={events} />
         ) : (

@@ -2,6 +2,7 @@
 
 import { Save, User } from "lucide-react";
 import { useEffect, useState } from "react";
+import { FollowedTeamsSection } from "@/components/dashboard/FollowedTeamsSection";
 import { ProfileAvatar } from "@/components/dashboard/ProfileAvatar";
 import { ProfileSignIn } from "@/components/dashboard/ProfileSignIn";
 import { SectionHeader } from "@/components/dashboard/ui/SectionHeader";
@@ -103,10 +104,12 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-2xl space-y-6">
       <SectionHeader title="Profile" icon={<User className="h-5 w-5" />} />
 
-      <div className="auth-glass-card mb-6 flex items-center gap-5 rounded-2xl p-6">
+      <FollowedTeamsSection />
+
+      <div className="auth-glass-card flex items-center gap-5 rounded-2xl p-6">
         <ProfileAvatar
           username={username || user.username}
           avatar={avatarPreview}

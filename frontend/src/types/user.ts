@@ -1,3 +1,9 @@
+export interface FollowedTeam {
+  id: number;
+  name: string;
+  logo?: string | null;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -7,6 +13,7 @@ export interface UserProfile {
   state: string | null;
   country: string | null;
   avatar: string | null;
+  followedTeams: FollowedTeam[];
 }
 
 export interface UpdateProfilePayload {

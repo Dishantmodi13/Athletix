@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import type { StandingRow } from "@/lib/football";
+import { teamRoute } from "@/lib/football";
 import { TeamLogo } from "./ui/TeamLogo";
 
 interface StandingsTableProps {
@@ -32,7 +33,7 @@ export function StandingsTable({ rows, limit }: StandingsTableProps) {
           {data.map((row) => (
             <tr
               key={row.team.id}
-              onClick={() => router.push(`/dashboard/team/${row.team.id}`)}
+              onClick={() => router.push(teamRoute(row.team.id, row.team.name))}
               className="cursor-pointer border-b border-white/[0.04] transition-colors last:border-0 hover:bg-white/[0.03]"
             >
               <td className="px-4 py-3">
